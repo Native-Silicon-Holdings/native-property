@@ -342,9 +342,79 @@ See `backend/prisma/schema.prisma` for complete schema definition.
 - Activity logging for audit trails
 - File type and size validation for uploads
 
-## Deployment
+## Docker Deployment
 
-### Backend Deployment (Railway/Render)
+The application is fully containerized with Docker and Docker Compose.
+
+### Quick Start with Docker
+
+1. **Copy environment file:**
+```bash
+cp .env.example .env
+# Edit .env with your configuration
+```
+
+2. **Start all services:**
+```bash
+docker-compose up -d
+```
+
+3. **Access the application:**
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:5000
+   - Database: localhost:5432
+
+4. **View logs:**
+```bash
+docker-compose logs -f
+```
+
+5. **Stop all services:**
+```bash
+docker-compose down
+```
+
+### Using Makefile Commands
+
+The project includes a Makefile for easier management:
+
+```bash
+# View all available commands
+make help
+
+# Start Docker containers
+make docker-up
+
+# View logs
+make docker-logs
+
+# Stop containers
+make docker-down
+
+# Build images
+make docker-build
+
+# Clean up Docker resources
+make docker-clean
+```
+
+### Development with Docker
+
+For development with hot-reload:
+
+```bash
+# Start development environment
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+# Or use Makefile
+make docker-dev
+```
+
+### Production Deployment
+
+#### Option 1: Traditional Deployment
+
+**Backend Deployment (Railway/Render):**
 
 1. **Prepare for deployment:**
 ```bash
@@ -364,7 +434,7 @@ npx prisma migrate deploy
 npm start
 ```
 
-### Frontend Deployment (Vercel/Netlify)
+**Frontend Deployment (Vercel/Netlify):**
 
 1. **Build the frontend:**
 ```bash
@@ -376,20 +446,72 @@ npm run build
 
 3. **Configure environment variables** with your production API URL
 
+#### Option 2: Docker Deployment
+
+**Deploy to Any Server with Docker:**
+
+1. **On your server, clone the repository:**
+```bash
+git clone <repository-url>
+cd estate-management-platform
+```
+
+2. **Configure environment:**
+```bash
+cp .env.example .env
+nano .env  # Edit with production values
+```
+
+3. **Start services:**
+```bash
+docker-compose up -d --build
+```
+
+4. **Run migrations:**
+```bash
+docker-compose exec backend npx prisma migrate deploy
+```
+
+#### Option 3: CI/CD with GitHub Actions
+
+The project includes GitHub Actions workflows for automated deployment.
+
+**Setup:**
+
+1. **Add secrets to GitHub repository:**
+   - `DOCKER_USERNAME` - Docker Hub username
+   - `DOCKER_PASSWORD` - Docker Hub password
+   - `DEPLOY_HOST` - Production server IP
+   - `DEPLOY_USER` - SSH username
+   - `DEPLOY_KEY` - SSH private key
+   - `API_URL` - Production API URL
+
+2. **Push to main branch** to trigger deployment
+
+**Workflows:**
+- `.github/workflows/ci.yml` - Runs tests on every push/PR
+- `.github/workflows/deploy.yml` - Deploys to production on main branch
+
 ### Environment-specific Configuration
 
 **Production Checklist:**
-- [ ] Use strong JWT secret
-- [ ] Enable HTTPS
+- [ ] Use strong JWT secret (minimum 32 characters)
+- [ ] Enable HTTPS with SSL certificates
 - [ ] Configure CORS for production domain
-- [ ] Set up database backups
+- [ ] Set up automated database backups
 - [ ] Configure email service (SendGrid/AWS SES)
 - [ ] Set up file storage (AWS S3/Cloudinary)
-- [ ] Enable rate limiting
-- [ ] Set up monitoring and logging
-- [ ] Configure SSL certificates
+- [ ] Enable rate limiting on API endpoints
+- [ ] Set up monitoring (Sentry, DataDog)
+- [ ] Configure logging (Winston, ELK Stack)
+- [ ] Use production database with proper backups
+- [ ] Set up health check endpoints
+- [ ] Configure firewall rules
+- [ ] Enable Docker health checks
 
 ## Development Workflow
+
+### Option 1: Local Development (without Docker)
 
 1. **Start backend:**
 ```bash
@@ -402,22 +524,124 @@ cd frontend && npm run dev
 ```
 
 3. **Access the application:**
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:5000
-- API Health Check: http://localhost:5000/health
-- Prisma Studio: `npm run prisma:studio` (from backend directory)
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:5000
+   - API Health Check: http://localhost:5000/health
+   - Prisma Studio: `npm run prisma:studio` (from backend directory)
+
+### Option 2: Docker Development
+
+```bash
+# Start all services with Docker
+make docker-dev
+
+# Or manually
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+
+### Using Makefile for Development
+
+```bash
+# Install all dependencies
+make install
+
+# Start development servers (local)
+make dev
+
+# Run database migrations
+make migrate
+
+# Open Prisma Studio
+make prisma-studio
+
+# Run tests
+make test
+
+# Run linters
+make lint
+```
 
 ## Testing
 
-Run tests:
+### Backend Tests
+
+The backend uses **Jest** and **Supertest** for testing.
+
 ```bash
-# Backend
 cd backend
+
+# Run all tests
 npm test
 
-# Frontend
+# Run tests in watch mode
+npm test -- --watch
+
+# Run tests with coverage
+npm test -- --coverage
+
+# Run specific test file
+npm test -- auth.test.ts
+```
+
+**Test Structure:**
+- `src/__tests__/utils/` - Unit tests for utility functions
+- `src/__tests__/integration/` - Integration tests for API endpoints
+- `src/__tests__/setup.ts` - Test configuration and mocks
+
+**Example Tests:**
+- Password utilities (hashing, validation)
+- JWT token generation and verification
+- Authentication endpoints (register, login, profile)
+- Document management endpoints
+- Authorization middleware
+
+### Frontend Tests
+
+The frontend uses **Vitest** and **React Testing Library** for testing.
+
+```bash
 cd frontend
+
+# Run all tests
 npm test
+
+# Run tests in UI mode
+npm run test:ui
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run tests in watch mode
+npm test -- --watch
+```
+
+**Test Structure:**
+- `src/__tests__/components/` - Component tests
+- `src/__tests__/utils/` - Utility function tests
+- `src/__tests__/setup.ts` - Test configuration
+
+**Example Tests:**
+- Login component rendering and validation
+- API service configuration
+- localStorage handling
+- Form validation
+
+### Running All Tests
+
+Use the Makefile for convenience:
+
+```bash
+# Run all tests (backend + frontend)
+make test
+
+# Run tests with coverage
+make test-coverage
+
+# Run only backend tests
+make test-backend
+
+# Run only frontend tests
+make test-frontend
 ```
 
 ## Future Enhancements (Phase 2+)
