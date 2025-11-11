@@ -1,0 +1,408 @@
+// Prisma Schema for Estate Management Platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Roles Enum
+enum UserRole {
+  DIRECTOR
+  MANAGER
+  HOMEOWNER
+  TENANT
+  ACCOUNTANT
+}
+
+// Users Table
+model User {
+  id                String   @id @default(uuid())
+  email             String   @unique
+  passwordHash      String
+  firstName         String
+  lastName          String
+  phoneNumber       String?
+  role              UserRole @default(HOMEOWNER)
+  isActive          Boolean  @default(true)
+  emailVerified     Boolean  @default(false)
+  twoFactorEnabled  Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  lastLogin         DateTime?
+
+  // Relations
+  property          Property?              @relation(fields: [propertyId], references: [id])
+  propertyId        String?
+
+  documentsUploaded Document[]             @relation("DocumentUploader")
+  announcementsPosted Announcement[]
+  meetingsCreated   Meeting[]
+  readAnnouncements AnnouncementRead[]
+  meetingAttendance MeetingAttendance[]
+  maintenanceRequests MaintenanceRequest[]
+  activityLogs      ActivityLog[]
+
+  @@index([email])
+  @@map("users")
+}
+
+// Property Types Enum
+enum PropertyType {
+  HOUSE
+  APARTMENT
+  TOWNHOUSE
+  COMMERCIAL
+}
+
+// Properties Table
+model Property {
+  id           String       @id @default(uuid())
+  unitNumber   String       @unique
+  address      String
+  propertyType PropertyType
+  squareMeters Float
+  occupants    Int          @default(1)
+
+  // Relations
+  users        User[]
+  utilityReadings UtilityReading[]
+  payments     Payment[]
+  maintenanceRequests MaintenanceRequest[]
+
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([unitNumber])
+  @@map("properties")
+}
+
+// Document Categories Enum
+enum DocumentCategory {
+  AGM_MINUTES
+  FINANCIAL_REPORTS
+  RULES_REGULATIONS
+  CONTRACTS
+  POLICIES
+  OTHER
+}
+
+// Document Approval Status Enum
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Documents Table
+model Document {
+  id              String          @id @default(uuid())
+  title           String
+  description     String?
+  category        DocumentCategory
+  fileUrl         String
+  fileSize        Int
+  version         Int             @default(1)
+  tags            String[]
+  isArchived      Boolean         @default(false)
+  approvalStatus  ApprovalStatus  @default(APPROVED)
+
+  uploadedBy      User            @relation("DocumentUploader", fields: [uploadedById], references: [id])
+  uploadedById    String
+  uploadedAt      DateTime        @default(now())
+
+  // Relations
+  versions        DocumentVersion[]
+
+  @@index([category, uploadedAt])
+  @@map("documents")
+}
+
+// Document Versions Table
+model DocumentVersion {
+  id          String   @id @default(uuid())
+  documentId  String
+  version     Int
+  fileUrl     String
+  changeNotes String?
+  uploadedById String
+  uploadedAt  DateTime @default(now())
+
+  // Relations
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, version])
+  @@map("document_versions")
+}
+
+// Announcement Categories Enum
+enum AnnouncementCategory {
+  URGENT
+  MAINTENANCE
+  FINANCIAL
+  SOCIAL
+  GENERAL
+}
+
+// Priority Levels Enum
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// Announcements Table
+model Announcement {
+  id                    String                @id @default(uuid())
+  title                 String
+  content               String
+  category              AnnouncementCategory
+  priority              Priority              @default(MEDIUM)
+  isPinned              Boolean               @default(false)
+  requiresAcknowledgment Boolean              @default(false)
+  attachments           String[]
+  expiresAt             DateTime?
+
+  postedBy              User                  @relation(fields: [postedById], references: [id])
+  postedById            String
+  postedAt              DateTime              @default(now())
+
+  // Relations
+  reads                 AnnouncementRead[]
+
+  @@index([postedAt, category])
+  @@map("announcements")
+}
+
+// Announcement Reads Table
+model AnnouncementRead {
+  id              String       @id @default(uuid())
+  announcementId  String
+  userId          String
+  readAt          DateTime     @default(now())
+  acknowledged    Boolean      @default(false)
+
+  // Relations
+  announcement    Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, userId])
+  @@map("announcement_reads")
+}
+
+// Utility Types Enum
+enum UtilityType {
+  WATER
+  ELECTRICITY
+  GAS
+}
+
+// Utility Readings Table
+model UtilityReading {
+  id              String      @id @default(uuid())
+  propertyId      String
+  utilityType     UtilityType
+  readingDate     DateTime
+  meterReading    Float
+  previousReading Float
+  consumption     Float
+  rate            Float
+  amount          Float
+  recordedById    String
+
+  // Relations
+  property        Property    @relation(fields: [propertyId], references: [id])
+
+  createdAt       DateTime    @default(now())
+
+  @@index([propertyId, readingDate])
+  @@map("utility_readings")
+}
+
+// Payment Method Enum
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CARD
+  CHEQUE
+  EFT
+}
+
+// Payment Status Enum
+enum PaymentStatus {
+  PENDING
+  CLEARED
+  BOUNCED
+}
+
+// Payments Table
+model Payment {
+  id            String        @id @default(uuid())
+  propertyId    String
+  amount        Float
+  paymentDate   DateTime
+  paymentMethod PaymentMethod
+  reference     String
+  allocatedTo   Json          // Breakdown by utility/levy
+  status        PaymentStatus @default(PENDING)
+  receiptUrl    String?
+
+  // Relations
+  property      Property      @relation(fields: [propertyId], references: [id])
+
+  createdAt     DateTime      @default(now())
+
+  @@index([propertyId, paymentDate])
+  @@map("payments")
+}
+
+// Billing Cycle Status Enum
+enum BillingCycleStatus {
+  OPEN
+  CLOSED
+  PUBLISHED
+}
+
+// Billing Cycles Table
+model BillingCycle {
+  id          String             @id @default(uuid())
+  startDate   DateTime
+  endDate     DateTime
+  status      BillingCycleStatus @default(OPEN)
+  publishedAt DateTime?
+
+  createdAt   DateTime           @default(now())
+
+  @@map("billing_cycles")
+}
+
+// Meeting Types Enum
+enum MeetingType {
+  AGM
+  SPECIAL
+  BOARD
+  COMMITTEE
+}
+
+// Meeting Status Enum
+enum MeetingStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+// Meetings Table
+model Meeting {
+  id             String        @id @default(uuid())
+  title          String
+  type           MeetingType
+  description    String?
+  scheduledDate  DateTime
+  location       String
+  agendaUrl      String?
+  minutesUrl     String?
+  status         MeetingStatus @default(SCHEDULED)
+  requiredQuorum Int           @default(0)
+
+  createdBy      User          @relation(fields: [createdById], references: [id])
+  createdById    String
+  createdAt      DateTime      @default(now())
+
+  // Relations
+  attendance     MeetingAttendance[]
+
+  @@index([scheduledDate, status])
+  @@map("meetings")
+}
+
+// RSVP Status Enum
+enum RSVPStatus {
+  ATTENDING
+  NOT_ATTENDING
+  MAYBE
+}
+
+// Meeting Attendance Table
+model MeetingAttendance {
+  id                String      @id @default(uuid())
+  meetingId         String
+  userId            String
+  rsvpStatus        RSVPStatus?
+  actualAttendance  Boolean     @default(false)
+  proxyFor          String?
+
+  // Relations
+  meeting           Meeting     @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt         DateTime    @default(now())
+
+  @@unique([meetingId, userId])
+  @@map("meeting_attendance")
+}
+
+// Maintenance Categories Enum
+enum MaintenanceCategory {
+  PLUMBING
+  ELECTRICAL
+  SECURITY
+  GARDEN
+  CLEANING
+  STRUCTURAL
+  OTHER
+}
+
+// Maintenance Status Enum
+enum MaintenanceStatus {
+  SUBMITTED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+// Maintenance Requests Table
+model MaintenanceRequest {
+  id            String              @id @default(uuid())
+  propertyId    String
+  submittedById String
+  category      MaintenanceCategory
+  priority      Priority
+  description   String
+  photos        String[]
+  status        MaintenanceStatus   @default(SUBMITTED)
+  assignedTo    String?
+  estimatedCost Float?
+  actualCost    Float?
+  rating        Int?
+  feedback      String?
+
+  submittedAt   DateTime            @default(now())
+  resolvedAt    DateTime?
+
+  // Relations
+  property      Property            @relation(fields: [propertyId], references: [id])
+  submittedBy   User                @relation(fields: [submittedById], references: [id])
+
+  @@index([propertyId, status])
+  @@map("maintenance_requests")
+}
+
+// Activity Logs Table
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String
+  action    String
+  module    String
+  details   Json?
+  ipAddress String?
+  timestamp DateTime @default(now())
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, timestamp])
+  @@map("activity_logs")
+}
