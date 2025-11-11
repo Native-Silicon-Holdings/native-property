@@ -1,0 +1,30 @@
+{
+  "admin": {
+    "email": "admin@estatemanagement.com",
+    "password": "AdminPass123!",
+    "firstName": "Admin",
+    "lastName": "User",
+    "role": "DIRECTOR"
+  },
+  "manager": {
+    "email": "manager@estatemanagement.com",
+    "password": "ManagerPass123!",
+    "firstName": "Manager",
+    "lastName": "User",
+    "role": "MANAGER"
+  },
+  "homeowner": {
+    "email": "homeowner@estatemanagement.com",
+    "password": "HomeownerPass123!",
+    "firstName": "John",
+    "lastName": "Doe",
+    "role": "HOMEOWNER"
+  },
+  "newUser": {
+    "email": "newuser@example.com",
+    "password": "NewUserPass123!",
+    "firstName": "New",
+    "lastName": "User",
+    "phoneNumber": "+1234567890"
+  }
+}

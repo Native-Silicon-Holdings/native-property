@@ -10,7 +10,11 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "cypress": "cypress open",
+    "cypress:headless": "cypress run",
+    "test:e2e": "start-server-and-test dev http://localhost:3000 cypress",
+    "test:e2e:headless": "start-server-and-test dev http://localhost:3000 cypress:headless"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -36,11 +40,13 @@
     "@vitejs/plugin-react": "^4.2.1",
     "@vitest/ui": "^1.0.4",
     "autoprefixer": "^10.4.16",
+    "cypress": "^13.6.2",
     "eslint": "^8.55.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
     "jsdom": "^23.0.1",
     "postcss": "^8.4.32",
+    "start-server-and-test": "^2.0.3",
     "tailwindcss": "^3.3.6",
     "typescript": "^5.2.2",
     "vite": "^5.0.8",

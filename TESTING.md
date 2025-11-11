@@ -483,3 +483,89 @@ jest.setTimeout(10000);
 | Coverage | `npm test -- --coverage` | `npm run test:coverage` |
 | UI mode | N/A | `npm run test:ui` |
 | Specific file | `npm test -- <file>` | `npm test -- <file>` |
+
+## End-to-End (E2E) Testing with Cypress
+
+The platform includes comprehensive E2E tests using Cypress for testing complete user flows.
+
+### Running E2E Tests
+
+```bash
+cd frontend
+
+# Open Cypress Test Runner (interactive)
+npm run cypress
+
+# Run headless
+npm run test:e2e:headless
+
+# Run with auto server start
+npm run test:e2e
+```
+
+### Using Makefile
+
+```bash
+# Open Cypress GUI
+make test-e2e-open
+
+# Run E2E tests headless
+make test-e2e
+```
+
+### E2E Test Structure
+
+```
+frontend/cypress/
+├── e2e/
+│   ├── auth/               # Authentication tests
+│   ├── dashboard/          # Dashboard navigation
+│   ├── features/           # Feature tests
+│   └── accessibility/      # Accessibility tests
+├── fixtures/               # Test data
+├── support/
+│   ├── commands.ts        # Custom commands
+│   └── e2e.ts            # Global config
+└── cypress.config.ts      # Configuration
+```
+
+### Custom Cypress Commands
+
+```typescript
+// Login via UI
+cy.login('user@example.com', 'password123');
+
+// Login via API (faster for setup)
+cy.loginViaApi('user@example.com', 'password123');
+
+// Register new user
+cy.register({email, password, firstName, lastName});
+
+// Get element by test ID
+cy.getByTestId('submit-button').click();
+```
+
+### Example E2E Test
+
+```typescript
+describe('Login Flow', () => {
+  it('should login successfully', () => {
+    cy.visit('/login');
+    cy.get('input[name="email"]').type('test@example.com');
+    cy.get('input[name="password"]').type('password123');
+    cy.get('button[type="submit"]').click();
+
+    cy.url().should('include', '/dashboard');
+    cy.contains('Welcome back').should('be.visible');
+  });
+});
+```
+
+### CI/CD Integration
+
+E2E tests run automatically in GitHub Actions:
+- Videos recorded for all test runs
+- Screenshots captured on failures
+- Artifacts available for 7 days
+
+See [E2E.md](../E2E.md) for comprehensive E2E testing guide.

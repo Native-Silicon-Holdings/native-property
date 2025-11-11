@@ -1,0 +1,14 @@
+{
+  "urgent": {
+    "title": "Emergency Maintenance Notice",
+    "content": "Water will be shut off from 10 AM to 2 PM tomorrow for emergency repairs.",
+    "category": "URGENT",
+    "priority": "URGENT"
+  },
+  "general": {
+    "title": "Community Meeting Next Week",
+    "content": "Join us for the monthly community meeting next Tuesday at 7 PM in the clubhouse.",
+    "category": "GENERAL",
+    "priority": "MEDIUM"
+  }
+}

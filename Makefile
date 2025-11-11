@@ -61,6 +61,14 @@ test-frontend:
 	@echo "Running frontend tests..."
 	cd frontend && npm test
 
+test-e2e:
+	@echo "Running E2E tests with Cypress..."
+	cd frontend && npm run test:e2e:headless
+
+test-e2e-open:
+	@echo "Opening Cypress Test Runner..."
+	cd frontend && npm run cypress
+
 test-coverage:
 	@echo "Running tests with coverage..."
 	cd backend && npm test -- --coverage
