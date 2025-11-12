@@ -71,6 +71,7 @@ estate-management-platform/
 ### User Management & Authentication
 - ✅ User registration and login
 - ✅ JWT-based authentication
+- ✅ **Facial Recognition Authentication** (Alternative login method)
 - ✅ Role-based access control (Director, Manager, Homeowner, Tenant, Accountant)
 - ✅ Password strength validation
 - ✅ Activity logging
@@ -227,6 +228,7 @@ npm run build
 The platform uses the following main entities:
 
 - **Users**: User accounts with roles and authentication
+- **FacialVerifications**: Facial recognition verification records
 - **Properties**: Estate properties/units
 - **Documents**: Document management with versioning
 - **Announcements**: Estate-wide announcements
@@ -246,6 +248,14 @@ See `backend/prisma/schema.prisma` for complete schema definition.
 - `GET /api/auth/profile` - Get current user profile
 - `PUT /api/auth/profile` - Update profile
 - `POST /api/auth/change-password` - Change password
+
+### Facial Authentication
+- `POST /api/facial-auth/initialize` - Initialize facial verification session
+- `POST /api/facial-auth/upload/:verificationId` - Upload verification video
+- `GET /api/facial-auth/status/:verificationId` - Check verification status
+- `POST /api/facial-auth/login` - Login with facial verification
+- `POST /api/facial-auth/enable` - Enable facial auth (Authenticated)
+- `POST /api/facial-auth/disable` - Disable facial auth (Authenticated)
 
 ### Documents
 - `GET /api/documents` - List documents
@@ -691,6 +701,10 @@ npx prisma generate
 
 - **API Documentation**: Available at `/api/docs` (when Swagger is configured)
 - **Database Schema**: See `backend/prisma/schema.prisma`
+- **Testing Guide**: See [TESTING.md](./TESTING.md) for comprehensive testing documentation
+- **E2E Testing**: See [E2E.md](./E2E.md) for Cypress E2E testing guide
+- **Docker Guide**: See [DOCKER.md](./DOCKER.md) for containerization and deployment
+- **Facial Authentication**: See [FACIAL_AUTH.md](./FACIAL_AUTH.md) for facial recognition setup and usage
 - **Issues**: Report bugs and request features via GitHub Issues
 
 ## License

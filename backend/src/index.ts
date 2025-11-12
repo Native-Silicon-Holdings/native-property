@@ -5,6 +5,7 @@ import path from 'path';
 
 // Import routes
 import authRoutes from './routes/auth.routes';
+import facialAuthRoutes from './routes/facial-auth.routes';
 import documentRoutes from './routes/document.routes';
 import announcementRoutes from './routes/announcement.routes';
 import utilityRoutes from './routes/utility.routes';
@@ -42,6 +43,7 @@ app.get('/health', (req: Request, res: Response) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/facial-auth', facialAuthRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/utilities', utilityRoutes);

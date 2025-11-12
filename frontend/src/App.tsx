@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Layout from './components/layout/Layout';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
+import FacialAuthPage from './pages/auth/FacialAuthPage';
 import Dashboard from './pages/Dashboard';
 import Documents from './pages/documents/Documents';
 import DocumentDetail from './pages/documents/DocumentDetail';
@@ -62,6 +63,7 @@ function AppRoutes() {
       {/* Public routes */}
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+      <Route path="/facial-auth" element={<PublicRoute><FacialAuthPage /></PublicRoute>} />
 
       {/* Protected routes */}
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>

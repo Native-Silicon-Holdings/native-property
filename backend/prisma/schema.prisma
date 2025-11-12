@@ -30,6 +30,8 @@ model User {
   isActive          Boolean  @default(true)
   emailVerified     Boolean  @default(false)
   twoFactorEnabled  Boolean  @default(false)
+  facialAuthEnabled Boolean  @default(false)
+  facialVerified    Boolean  @default(false)
   createdAt         DateTime @default(now())
   lastLogin         DateTime?
 
@@ -44,6 +46,7 @@ model User {
   meetingAttendance MeetingAttendance[]
   maintenanceRequests MaintenanceRequest[]
   activityLogs      ActivityLog[]
+  facialVerifications FacialVerification[]
 
   @@index([email])
   @@map("users")
@@ -405,4 +408,36 @@ model ActivityLog {
 
   @@index([userId, timestamp])
   @@map("activity_logs")
+}
+
+// Facial Verification Status Enum
+enum FacialVerificationStatus {
+  PENDING
+  PROCESSING
+  VERIFIED
+  FAILED
+  EXPIRED
+}
+
+// Facial Verification Table
+model FacialVerification {
+  id                String                   @id @default(uuid())
+  userId            String
+  videoUrl          String?
+  complianceVideoUrl String?
+  status            FacialVerificationStatus @default(PENDING)
+  verificationScore Float?
+  metadata          Json?                    // Store additional verification data
+  expiresAt         DateTime?
+  verifiedAt        DateTime?
+  failureReason     String?
+
+  // Relations
+  user              User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  @@index([userId, status])
+  @@map("facial_verifications")
 }

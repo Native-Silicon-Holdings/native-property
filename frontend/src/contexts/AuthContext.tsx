@@ -7,6 +7,7 @@ interface AuthContextType {
   token: string | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithFacialAuth: (verificationId: string) => Promise<void>;
   register: (data: any) => Promise<void>;
   logout: () => void;
   updateUser: (user: User) => void;
@@ -76,6 +77,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const loginWithFacialAuth = async (verificationId: string) => {
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/facial-auth/login`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ verificationId }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || 'Facial authentication failed');
+    }
+
+    const { user, token } = data.data;
+    setUser(user);
+    setToken(token);
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(user));
+  };
+
   const register = async (data: any) => {
     const response: AxiosResponse<ApiResponse<{ user: User; token: string }>> =
       await authApi.register(data);
@@ -108,6 +134,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     token,
     loading,
     login,
+    loginWithFacialAuth,
     register,
     logout,
     updateUser,
