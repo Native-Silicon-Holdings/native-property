@@ -66,6 +66,7 @@ const sidebars: SidebarsConfig = {
         'developer/architecture',
         'developer/tech-stack',
         'developer/project-structure',
+        'developer/tauri-desktop',
       ],
     },
     {

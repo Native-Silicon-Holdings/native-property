@@ -1,6 +1,6 @@
 # Estate Management Platform
 
-A comprehensive web-based estate management platform designed to solve governance, communication, and accountability issues in residential estates.
+A comprehensive estate management platform designed to solve governance, communication, and accountability issues in residential estates. Available as both a web application and native desktop app.
 
 ## Overview
 
@@ -11,6 +11,19 @@ This platform addresses common challenges in estate management:
 - Unclear governance and election procedures
 - Poor meeting communication
 - Questionable legal compliance
+
+## 🖥️ Desktop Application
+
+**NEW**: Native desktop application built with Tauri v2!
+
+- **Cross-Platform**: Windows, macOS, and Linux
+- **Lightweight**: 10-15MB installers (vs 100MB+ Electron apps)
+- **Native Performance**: Built with Rust for maximum speed
+- **System Integration**: Tray icons, notifications, file system access
+- **Auto-Updates**: Seamless automatic updates
+- **Secure**: Sandboxed execution with encrypted local storage
+
+📖 **[Desktop App Documentation](./TAURI_DESKTOP.md)** | **[Developer Guide](./docs/docs/developer/tauri-desktop.md)**
 
 ## Technology Stack
 
