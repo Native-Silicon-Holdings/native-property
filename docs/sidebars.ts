@@ -10,6 +10,7 @@ const sidebars: SidebarsConfig = {
         'user-guide/getting-started',
         'user-guide/first-login',
         'user-guide/dashboard-overview',
+        'user-guide/desktop-app',
       ],
     },
     {
@@ -17,6 +18,7 @@ const sidebars: SidebarsConfig = {
       label: 'Authentication',
       items: [
         'user-guide/authentication/login',
+        'user-guide/authentication/two-factor',
         'user-guide/authentication/facial-authentication',
         'user-guide/authentication/password-reset',
         'user-guide/authentication/profile-settings',
@@ -52,6 +54,13 @@ const sidebars: SidebarsConfig = {
         'user-guide/troubleshooting/common-issues',
         'user-guide/troubleshooting/facial-auth-issues',
         'user-guide/troubleshooting/upload-issues',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Enterprise',
+      items: [
+        'enterprise/features',
       ],
     },
   ],
