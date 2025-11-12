@@ -699,13 +699,49 @@ npx prisma generate
 
 ## Support & Documentation
 
-- **API Documentation**: Available at `/api/docs` (when Swagger is configured)
-- **Database Schema**: See `backend/prisma/schema.prisma`
-- **Testing Guide**: See [TESTING.md](./TESTING.md) for comprehensive testing documentation
-- **E2E Testing**: See [E2E.md](./E2E.md) for Cypress E2E testing guide
-- **Docker Guide**: See [DOCKER.md](./DOCKER.md) for containerization and deployment
-- **Facial Authentication**: See [FACIAL_AUTH.md](./FACIAL_AUTH.md) for facial recognition setup and usage
-- **Issues**: Report bugs and request features via GitHub Issues
+### 📚 Comprehensive Documentation (Docusaurus)
+
+**Main Documentation Site**: [`docs/`](./docs/) - Built with Docusaurus
+
+- **🏠 [Introduction](./docs/docs/intro.md)** - Platform overview and quick start
+- **📖 [User Guide](./docs/docs/user-guide/getting-started.md)** - Complete end-user documentation
+  - Getting started and first login
+  - Facial authentication setup
+  - Feature guides (Documents, Announcements, Utilities, etc.)
+  - Role-specific guides
+  - Troubleshooting
+- **👨‍💻 [Developer Documentation](./docs/docs/developer/setup.md)** - Technical documentation
+  - Development setup
+  - Architecture and design
+  - Backend/Frontend guides
+  - Testing strategies
+  - Contributing guidelines
+- **📡 [API Reference](./docs/docs/api/overview.md)** - Complete API documentation
+  - Authentication
+  - All API endpoints
+  - Request/response examples
+
+**Run Documentation Locally**:
+```bash
+cd docs
+npm install
+npm start  # Opens at http://localhost:3000
+```
+
+### 📄 Quick Reference Guides
+
+- **Testing**: [TESTING.md](./TESTING.md) - Comprehensive testing documentation
+- **E2E Testing**: [E2E.md](./E2E.md) - Cypress E2E testing guide
+- **Docker**: [DOCKER.md](./DOCKER.md) - Containerization and deployment
+- **Facial Auth**: [FACIAL_AUTH.md](./FACIAL_AUTH.md) - Facial recognition setup
+- **Security**: [SECURITY.md](./SECURITY.md) - Security measures and best practices
+- **Database Schema**: `backend/prisma/schema.prisma` - Complete data model
+
+### 🐛 Support
+
+- **Issues**: [Report bugs](https://github.com/Coded-Shogun/native-property/issues)
+- **Security**: security@estatemanagement.com
+- **Contributing**: See [Contributing Guidelines](./docs/docs/developer/contributing/guidelines.md)
 
 ## License
 
