@@ -14,6 +14,7 @@ const prisma = new PrismaClient();
 export const initializeFacialVerification = async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
+    const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
 
     if (!email) {
       sendBadRequest(res, 'Email is required');
@@ -30,11 +31,21 @@ export const initializeFacialVerification = async (req: Request, res: Response) 
         lastName: true,
         facialAuthEnabled: true,
         facialVerified: true,
+        isActive: true,
       },
     });
 
     if (!user) {
+      // Log failed attempt without revealing user existence
+      console.warn(`Facial auth initialization attempted for non-existent email from IP: ${ipAddress}`);
       sendNotFound(res, 'User not found');
+      return;
+    }
+
+    // Check if user account is active
+    if (!user.isActive) {
+      console.warn(`Facial auth initialization attempted for inactive user: ${user.id} from IP: ${ipAddress}`);
+      sendUnauthorized(res, 'Account is inactive');
       return;
     }
 
@@ -43,12 +54,63 @@ export const initializeFacialVerification = async (req: Request, res: Response) 
       return;
     }
 
+    // Check for too many pending verifications (prevent DoS)
+    const recentPendingCount = await prisma.facialVerification.count({
+      where: {
+        userId: user.id,
+        status: { in: ['PENDING', 'PROCESSING'] },
+        createdAt: {
+          gte: new Date(Date.now() - 60 * 60 * 1000), // Last hour
+        },
+      },
+    });
+
+    if (recentPendingCount >= 5) {
+      console.warn(`Too many pending verifications for user: ${user.id} from IP: ${ipAddress}`);
+      sendBadRequest(res, 'Too many pending verifications. Please try again later.');
+      return;
+    }
+
+    // Cleanup old expired verifications for this user
+    await prisma.facialVerification.deleteMany({
+      where: {
+        userId: user.id,
+        OR: [
+          { status: 'EXPIRED' },
+          {
+            status: 'PENDING',
+            createdAt: {
+              lt: new Date(Date.now() - 24 * 60 * 60 * 1000), // Older than 24 hours
+            },
+          },
+        ],
+      },
+    });
+
     // Create a new verification session
     const verification = await prisma.facialVerification.create({
       data: {
         userId: user.id,
         status: FacialVerificationStatus.PENDING,
         expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes expiry
+        metadata: {
+          ipAddress,
+          userAgent: req.headers['user-agent'] || 'unknown',
+          initiatedAt: new Date().toISOString(),
+        },
+      },
+    });
+
+    // Log activity
+    await prisma.activityLog.create({
+      data: {
+        userId: user.id,
+        action: 'FACIAL_VERIFICATION_INITIALIZED',
+        module: 'FACIAL_AUTH',
+        details: {
+          verificationId: verification.id,
+        },
+        ipAddress,
       },
     });
 
@@ -75,6 +137,8 @@ export const uploadVerificationVideo = async (req: Request, res: Response) => {
   try {
     const { verificationId } = req.params;
     const file = req.file;
+    const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
+    const fileHash = req.body.fileHash; // From validation middleware
 
     if (!file) {
       sendBadRequest(res, 'Video file is required');
@@ -88,7 +152,15 @@ export const uploadVerificationVideo = async (req: Request, res: Response) => {
     });
 
     if (!verification) {
+      console.warn(`Upload attempted for non-existent verification ID from IP: ${ipAddress}`);
       sendNotFound(res, 'Verification session not found');
+      return;
+    }
+
+    // Verify user account is still active
+    if (!verification.user.isActive) {
+      console.warn(`Upload attempted for inactive user: ${verification.userId} from IP: ${ipAddress}`);
+      sendUnauthorized(res, 'Account is inactive');
       return;
     }
 
@@ -98,21 +170,49 @@ export const uploadVerificationVideo = async (req: Request, res: Response) => {
         where: { id: verificationId },
         data: { status: FacialVerificationStatus.EXPIRED },
       });
+      console.warn(`Upload attempted for expired verification: ${verificationId} from IP: ${ipAddress}`);
       sendBadRequest(res, 'Verification session has expired');
       return;
     }
 
-    // Update verification with video URL
+    // Prevent multiple uploads for the same verification
+    if (verification.videoUrl) {
+      console.warn(`Duplicate upload attempted for verification: ${verificationId} from IP: ${ipAddress}`);
+      sendBadRequest(res, 'Video has already been uploaded for this verification');
+      return;
+    }
+
+    // Update verification with video URL and metadata
     const updatedVerification = await prisma.facialVerification.update({
       where: { id: verificationId },
       data: {
         videoUrl: file.path,
         status: FacialVerificationStatus.PROCESSING,
         metadata: {
+          ...(verification.metadata as object),
+          uploadedAt: new Date().toISOString(),
+          uploadIpAddress: ipAddress,
           filename: file.filename,
+          originalName: file.originalname,
           size: file.size,
           mimetype: file.mimetype,
+          fileHash,
         },
+      },
+    });
+
+    // Log activity
+    await prisma.activityLog.create({
+      data: {
+        userId: verification.userId,
+        action: 'FACIAL_VERIFICATION_VIDEO_UPLOADED',
+        module: 'FACIAL_AUTH',
+        details: {
+          verificationId: verification.id,
+          fileSize: file.size,
+          fileType: file.mimetype,
+        },
+        ipAddress,
       },
     });
 
