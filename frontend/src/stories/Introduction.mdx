@@ -1,0 +1,209 @@
+import { Meta } from '@storybook/blocks';
+
+<Meta title="Introduction" />
+
+# Estate Management Platform - Component Library
+
+Welcome to the **Estate Management Platform Component Library**! This is a comprehensive collection of reusable UI components built with React, TypeScript, and Tailwind CSS.
+
+## 🎨 What is Storybook?
+
+Storybook is an open-source tool for building UI components and pages in isolation. It streamlines UI development, testing, and documentation.
+
+### Why Use Storybook?
+
+- **🔍 Develop in Isolation**: Build components without needing to start the entire application
+- **📖 Living Documentation**: Automatically generated docs that stay up-to-date
+- **✅ Visual Testing**: See all component states and variants in one place
+- **♿ Accessibility Testing**: Built-in a11y addon catches WCAG violations
+- **📱 Responsive Design**: Test components across different viewport sizes
+- **🌓 Dark Mode**: Test light and dark themes easily
+- **🎯 Interactive**: Play with props using controls panel
+
+## 🏗️ Architecture
+
+Our component library follows these principles:
+
+### Design System Hierarchy
+
+```
+┌─────────────────────────────────────┐
+│   Pages (Complex Compositions)      │
+├─────────────────────────────────────┤
+│   Components (Business Logic)       │
+├─────────────────────────────────────┤
+│   UI Elements (Reusable Primitives) │
+├─────────────────────────────────────┤
+│   Design Tokens (Colors, Spacing)   │
+└─────────────────────────────────────┘
+```
+
+### Component Categories
+
+1. **UI Components** (`UI/*`)
+   - Basic building blocks: Button, Input, Card, etc.
+   - Highly reusable across the application
+   - No business logic
+
+2. **Layout Components** (`Layout/*`)
+   - Header, Sidebar, Footer
+   - Page structure and navigation
+
+3. **Authentication Components** (`Auth/*`)
+   - Login forms, 2FA, Facial recognition
+   - User authentication flows
+
+4. **Feature Components** (`Features/*`)
+   - Property management, Documents, Announcements
+   - Business-specific functionality
+
+## 🎯 Getting Started
+
+### For Developers
+
+1. **Browse Components**: Explore the component tree in the left sidebar
+2. **View Documentation**: Each component has auto-generated docs
+3. **Interact with Controls**: Use the Controls panel to modify props
+4. **Test Accessibility**: Check the Accessibility tab for violations
+5. **Test Responsiveness**: Use the viewport toolbar to test different sizes
+6. **Toggle Dark Mode**: Use the dark mode addon in the toolbar
+
+### Writing Stories
+
+Create a new `.stories.tsx` file next to your component:
+
+```typescript
+import type { Meta, StoryObj } from '@storybook/react';
+import { MyComponent } from './MyComponent';
+
+const meta = {
+  title: 'UI/MyComponent',
+  component: MyComponent,
+  parameters: {
+    layout: 'centered',
+  },
+  tags: ['autodocs'],
+} satisfies Meta<typeof MyComponent>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+export const Default: Story = {
+  args: {
+    label: 'Hello World',
+  },
+};
+```
+
+## 🎨 Design Tokens
+
+### Colors
+
+Our color palette is based on the Tailwind CSS default theme with custom primary colors:
+
+- **Primary**: Blue shades for main actions
+- **Success**: Green for positive actions
+- **Danger**: Red for destructive actions
+- **Warning**: Yellow for warnings
+- **Gray**: Neutral shades for text and backgrounds
+
+### Typography
+
+- **Font Family**: System font stack for optimal performance
+- **Sizes**: `sm`, `base`, `lg`, `xl`, `2xl`, `3xl`
+- **Weights**: `normal` (400), `medium` (500), `semibold` (600), `bold` (700)
+
+### Spacing
+
+Following Tailwind's spacing scale:
+- `sm`: 0.875rem (14px)
+- `md`: 1rem (16px)
+- `lg`: 1.125rem (18px)
+
+## ♿ Accessibility
+
+All components are built with accessibility in mind:
+
+- ✅ **Keyboard Navigation**: All interactive elements are keyboard accessible
+- ✅ **ARIA Labels**: Proper ARIA attributes for screen readers
+- ✅ **Color Contrast**: WCAG AA compliant color combinations
+- ✅ **Focus Indicators**: Clear focus states for all interactive elements
+- ✅ **Semantic HTML**: Using proper HTML5 semantic elements
+
+Use the **Accessibility** tab to check for violations!
+
+## 📱 Responsive Design
+
+Components are designed mobile-first and tested across:
+
+- **Mobile**: 375px (iPhone SE)
+- **Tablet**: 768px (iPad)
+- **Desktop**: 1440px (Laptop)
+- **Wide**: 1920px (Desktop Monitor)
+
+Use the viewport toolbar to test different screen sizes.
+
+## 🌓 Dark Mode
+
+Toggle dark mode using the toolbar. Components automatically adapt to dark mode using Tailwind's `dark:` variants.
+
+## 🧪 Testing
+
+Each component should have:
+
+1. **Unit Tests**: Test component logic and props
+2. **Interaction Tests**: Test user interactions (using `@storybook/test`)
+3. **Accessibility Tests**: Automated a11y testing with `@storybook/addon-a11y`
+4. **Visual Regression**: Catch unintended visual changes
+
+## 📚 Resources
+
+- [Storybook Documentation](https://storybook.js.org/docs)
+- [React Documentation](https://react.dev)
+- [Tailwind CSS Documentation](https://tailwindcss.com/docs)
+- [Accessibility Guidelines (WCAG)](https://www.w3.org/WAI/WCAG21/quickref/)
+
+## 🚀 Quick Links
+
+- **UI Components**: Button, Input, Card, Badge, Modal
+- **Layout Components**: Header, Sidebar, Footer
+- **Forms**: Login, Registration, 2FA
+- **Enterprise Features**: See the main Docusaurus documentation
+
+## 🤝 Contributing
+
+When adding new components:
+
+1. ✅ Create the component with TypeScript
+2. ✅ Add comprehensive prop types with JSDoc comments
+3. ✅ Create a `.stories.tsx` file with multiple examples
+4. ✅ Ensure accessibility compliance
+5. ✅ Test responsive behavior
+6. ✅ Add unit tests
+
+## 💡 Best Practices
+
+### Component Design
+
+- **Single Responsibility**: Each component should do one thing well
+- **Composition over Configuration**: Prefer composable APIs
+- **Controlled vs Uncontrolled**: Support both patterns where appropriate
+- **Ref Forwarding**: Use `forwardRef` for DOM access
+
+### Props API
+
+- **Required vs Optional**: Make props optional unless absolutely necessary
+- **Sensible Defaults**: Provide good default values
+- **TypeScript**: Use strict types, avoid `any`
+- **Documentation**: Add JSDoc comments for all props
+
+### Styling
+
+- **Tailwind First**: Use Tailwind utility classes
+- **CSS Modules**: Only when Tailwind isn't sufficient
+- **Avoid Inline Styles**: Prefer className over style prop
+- **Theme Consistency**: Follow the design tokens
+
+---
+
+**Ready to explore?** Start by browsing the **UI Components** in the left sidebar! 🎉

@@ -97,6 +97,7 @@ const sidebars: SidebarsConfig = {
         'developer/frontend/routing',
         'developer/frontend/state-management',
         'developer/frontend/testing',
+        'developer/storybook',
       ],
     },
     {
