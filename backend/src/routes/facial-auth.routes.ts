@@ -27,7 +27,7 @@ const router = Router();
 
 // Configure multer for video uploads with enhanced security
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
+  destination: (_req, _file, cb) => {
     const uploadDir = path.join(__dirname, '../../uploads/facial-verifications');
     // Ensure directory exists with restricted permissions
     if (!fs.existsSync(uploadDir)) {
@@ -35,7 +35,7 @@ const storage = multer.diskStorage({
     }
     cb(null, uploadDir);
   },
-  filename: (req, file, cb) => {
+  filename: (_req, file, cb) => {
     // Use crypto for secure random filename generation
     const randomName = crypto.randomBytes(16).toString('hex');
     const timestamp = Date.now();
@@ -58,7 +58,7 @@ const upload = multer({
   limits: {
     fileSize: 50 * 1024 * 1024, // 50MB max file size
   },
-  fileFilter: (req, file, cb) => {
+  fileFilter: (_req, file, cb) => {
     const allowedMimeTypes = ['video/mp4', 'video/webm', 'video/ogg'];
     if (allowedMimeTypes.includes(file.mimetype)) {
       cb(null, true);

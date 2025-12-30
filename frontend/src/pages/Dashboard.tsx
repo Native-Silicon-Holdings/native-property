@@ -8,10 +8,9 @@ import {
   Wrench,
   TrendingUp,
   DollarSign,
-  Users,
   Building,
 } from 'lucide-react';
-import { announcementApi, meetingApi, maintenanceApi, utilityApi } from '../services/api';
+import { announcementApi, meetingApi, maintenanceApi } from '../services/api';
 
 const Dashboard = () => {
   const { user } = useAuth();

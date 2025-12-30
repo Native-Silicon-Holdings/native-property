@@ -15,6 +15,11 @@
     "cypress:headless": "cypress run",
     "test:e2e": "start-server-and-test dev http://localhost:3000 cypress",
     "test:e2e:headless": "start-server-and-test dev http://localhost:3000 cypress:headless",
+    "test:e2e:chrome": "cypress run --browser chrome",
+    "test:e2e:firefox": "cypress run --browser firefox",
+    "test:e2e:mobile": "cypress run --config viewportWidth=375,viewportHeight=667",
+    "test:accessibility": "cypress run --spec 'cypress/e2e/accessibility/**'",
+    "test:components": "test-storybook",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },

@@ -1,0 +1,35 @@
+{
+  "name": "make-commands-tests",
+  "version": "1.0.0",
+  "description": "Cypress test suite for validating all Makefile commands",
+  "main": "index.js",
+  "scripts": {
+    "cypress:open": "npx cypress open",
+    "cypress:run": "npx cypress run",
+    "test": "npx cypress run",
+    "test:headed": "npx cypress run --headed",
+    "test:chrome": "npx cypress run --browser chrome",
+    "test:firefox": "npx cypress run --browser firefox",
+    "test:priority1": "npx cypress run --spec 'cypress/e2e/01-setup/**,cypress/e2e/02-docker/lifecycle.cy.ts,cypress/e2e/03-database/init-and-seed.cy.ts,cypress/e2e/04-testing/unit-tests.cy.ts,cypress/e2e/06-build/production-build.cy.ts'",
+    "test:priority2": "npx cypress run --spec 'cypress/e2e/02-docker/rebuild.cy.ts,cypress/e2e/03-database/backup-restore.cy.ts,cypress/e2e/05-development/**'",
+    "test:priority3": "npx cypress run --spec 'cypress/e2e/04-testing/e2e-tests.cy.ts,cypress/e2e/06-build/versioning.cy.ts'",
+    "test:integration": "npx cypress run --spec 'cypress/e2e/07-integration/**'",
+    "test:smoke": "npx cypress run --spec 'cypress/e2e/01-setup/help.cy.ts,cypress/e2e/02-docker/lifecycle.cy.ts'",
+    "cleanup": "node -e \"require('child_process').execSync('cd .. && make docker-down', {stdio: 'inherit'})\""
+  },
+  "keywords": [
+    "cypress",
+    "testing",
+    "makefile",
+    "integration-tests",
+    "docker",
+    "e2e"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "cypress": "^13.6.2",
+    "typescript": "^5.3.3"
+  }
+}

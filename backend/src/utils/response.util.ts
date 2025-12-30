@@ -82,3 +82,25 @@ export const sendNotFound = (
 ): Response => {
   return sendError(res, message, null, 404);
 };
+
+/**
+ * Send bad request response
+ */
+export const sendBadRequest = (
+  res: Response,
+  message: string,
+  errors?: any
+): Response => {
+  return sendError(res, message, errors, 400);
+};
+
+/**
+ * Send server error response
+ */
+export const sendServerError = (
+  res: Response,
+  message: string = 'Internal server error',
+  errors?: any
+): Response => {
+  return sendError(res, message, errors, 500);
+};

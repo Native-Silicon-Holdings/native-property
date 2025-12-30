@@ -70,11 +70,11 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // ==================== HEALTH & MONITORING ====================
 
 // Health check endpoint (no authentication required)
-app.get('/health', async (req: Request, res: Response) => {
+app.get('/health', async (_req: Request, res: Response) => {
   try {
     // Check database connectivity
-    const { prisma } = await import('./services/prisma.service');
-    await prisma.$queryRaw`SELECT 1`;
+    const prismaModule = await import('./services/prisma.service');
+    await prismaModule.default.$queryRaw`SELECT 1`;
 
     res.status(200).json({
       status: 'healthy',
@@ -96,10 +96,10 @@ app.get('/health', async (req: Request, res: Response) => {
 });
 
 // Readiness check (for Kubernetes/container orchestration)
-app.get('/ready', async (req: Request, res: Response) => {
+app.get('/ready', async (_req: Request, res: Response) => {
   try {
-    const { prisma } = await import('./services/prisma.service');
-    await prisma.$queryRaw`SELECT 1`;
+    const prismaModule = await import('./services/prisma.service');
+    await prismaModule.default.$queryRaw`SELECT 1`;
     res.status(200).json({ ready: true });
   } catch (error) {
     res.status(503).json({ ready: false, reason: 'Database not ready' });
@@ -107,7 +107,7 @@ app.get('/ready', async (req: Request, res: Response) => {
 });
 
 // Liveness check (for Kubernetes/container orchestration)
-app.get('/live', (req: Request, res: Response) => {
+app.get('/live', (_req: Request, res: Response) => {
   res.status(200).json({ alive: true, timestamp: new Date().toISOString() });
 });
 
@@ -150,7 +150,7 @@ app.use((req: Request, res: Response) => {
 });
 
 // Global error handler
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
   // Log error details
   console.error('❌ ERROR:', {
     message: err.message,
@@ -184,8 +184,8 @@ const gracefulShutdown = async () => {
 
   try {
     // Close database connections
-    const { prisma } = await import('./services/prisma.service');
-    await prisma.$disconnect();
+    const prismaModule = await import('./services/prisma.service');
+    await prismaModule.default.$disconnect();
     console.log('✅ Database connections closed');
 
     // Exit process
@@ -216,7 +216,7 @@ process.on('uncaughtException', (error: Error) => {
 
 // ==================== START SERVER ====================
 
-const server = app.listen(PORT, () => {
+app.listen(PORT, () => {
   console.log('\n' + '='.repeat(60));
   console.log('🚀 Estate Management Platform API Server');
   console.log('='.repeat(60));

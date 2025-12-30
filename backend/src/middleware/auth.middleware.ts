@@ -57,7 +57,7 @@ export const authorize = (...allowedRoles: UserRole[]) => {
 /**
  * Optional authentication - adds user to request if token is valid, but doesn't require it
  */
-export const optionalAuth = (req: Request, res: Response, next: NextFunction): void => {
+export const optionalAuth = (req: Request, _res: Response, next: NextFunction): void => {
   try {
     const authHeader = req.headers.authorization;
 

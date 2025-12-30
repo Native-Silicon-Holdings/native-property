@@ -1,0 +1,34 @@
+{
+  "ports": {
+    "frontend": 3000,
+    "backend": 5000,
+    "database": 5432,
+    "prismaStudio": 5555,
+    "storybook": 6006
+  },
+  "timeouts": {
+    "docker": 60000,
+    "service": 30000,
+    "database": 30000,
+    "build": 120000,
+    "test": 60000
+  },
+  "expectedFiles": {
+    "env": ".env",
+    "backendEnv": "backend/.env",
+    "frontendEnv": "frontend/.env"
+  },
+  "dockerContainers": [
+    "native-property-postgres",
+    "native-property-backend",
+    "native-property-frontend"
+  ],
+  "helpCommands": [
+    "help",
+    "setup",
+    "start",
+    "stop",
+    "test",
+    "build"
+  ]
+}

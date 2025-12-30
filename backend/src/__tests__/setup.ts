@@ -1,5 +1,5 @@
 // Test setup file
-import { PrismaClient } from '@prisma/client';
+// PrismaClient type is available via @prisma/client but we mock the instance
 
 // Mock Prisma Client
 jest.mock('../services/prisma.service', () => ({

@@ -161,20 +161,6 @@ export const getProfile = async (req: Request, res: Response): Promise<void> => 
       where: { id: req.user.userId },
       include: {
         property: true
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        phoneNumber: true,
-        role: true,
-        isActive: true,
-        emailVerified: true,
-        twoFactorEnabled: true,
-        createdAt: true,
-        lastLogin: true,
-        property: true
       }
     });
 
@@ -218,7 +204,7 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
         role: true,
         isActive: true,
         emailVerified: true,
-        updatedAt: true
+        createdAt: true
       }
     });
 

@@ -1,7 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../services/prisma.service';
-import { sendSuccess, sendError, sendNotFound } from '../utils/response.util';
-import { UtilityType } from '@prisma/client';
+import { sendSuccess, sendError } from '../utils/response.util';
 
 /**
  * Get utility readings with filters

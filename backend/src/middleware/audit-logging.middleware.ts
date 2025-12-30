@@ -6,7 +6,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../services/prisma.service';
+import prisma from '../services/prisma.service';
 import { sanitizeForLogging } from '../utils/encryption.util';
 
 export interface AuditLogEntry {
@@ -198,7 +198,7 @@ export function auditLogger() {
       }
 
       // Call original end
-      return originalEnd.apply(this, args);
+      return originalEnd.apply(this, args as any);
     };
 
     next();
@@ -209,7 +209,7 @@ export function auditLogger() {
  * Middleware to log authentication events
  */
 export function logAuthEvent(action: AuditAction, details?: any) {
-  return async (req: Request, res: Response, next: NextFunction) => {
+  return async (req: Request, _res: Response, next: NextFunction) => {
     try {
       const entry: AuditLogEntry = {
         userId: (req as any).user?.userId || details?.userId,

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../services/prisma.service';
 import { sendSuccess, sendError, sendNotFound } from '../utils/response.util';
-import { MaintenanceCategory, Priority, MaintenanceStatus } from '@prisma/client';
+import { MaintenanceCategory, Priority } from '@prisma/client';
 
 /**
  * Get all maintenance requests with filters

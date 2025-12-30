@@ -2,8 +2,6 @@ import { Request, Response } from 'express';
 import { PrismaClient, FacialVerificationStatus } from '@prisma/client';
 import { sendSuccess, sendBadRequest, sendUnauthorized, sendNotFound, sendServerError } from '../utils/response.util';
 import { generateToken } from '../utils/jwt.util';
-import fs from 'fs/promises';
-import path from 'path';
 
 const prisma = new PrismaClient();
 

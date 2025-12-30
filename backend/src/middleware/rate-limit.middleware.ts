@@ -15,10 +15,10 @@ export const facialAuthRateLimiter = rateLimit({
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   // Skip rate limiting for successful requests in testing
-  skip: (req: Request) => {
+  skip: (_req: Request) => {
     return process.env.NODE_ENV === 'test';
   },
-  handler: (req: Request, res: Response) => {
+  handler: (_req: Request, res: Response) => {
     res.status(429).json({
       success: false,
       message: 'Too many verification attempts from this IP. Please try again after 15 minutes.',
@@ -40,10 +40,10 @@ export const videoUploadRateLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req: Request) => {
+  skip: (_req: Request) => {
     return process.env.NODE_ENV === 'test';
   },
-  handler: (req: Request, res: Response) => {
+  handler: (_req: Request, res: Response) => {
     res.status(429).json({
       success: false,
       message: 'Too many upload attempts. Please try again after 1 hour.',
@@ -65,11 +65,11 @@ export const loginRateLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req: Request) => {
+  skip: (_req: Request) => {
     return process.env.NODE_ENV === 'test';
   },
   skipSuccessfulRequests: true, // Don't count successful logins
-  handler: (req: Request, res: Response) => {
+  handler: (_req: Request, res: Response) => {
     res.status(429).json({
       success: false,
       message: 'Too many login attempts. Please try again after 15 minutes.',
@@ -86,10 +86,10 @@ export const apiRateLimiter = rateLimit({
   max: 100, // Limit each IP to 100 requests per windowMs
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req: Request) => {
+  skip: (_req: Request) => {
     return process.env.NODE_ENV === 'test';
   },
-  handler: (req: Request, res: Response) => {
+  handler: (_req: Request, res: Response) => {
     res.status(429).json({
       success: false,
       message: 'Too many requests. Please try again later.',

@@ -17,7 +17,7 @@ const receiptsDir = path.join(uploadDir, 'receipts');
 
 // Configure storage
 const storage = multer.diskStorage({
-  destination: (req: Request, file: Express.Multer.File, cb) => {
+  destination: (_req: Request, file: Express.Multer.File, cb) => {
     let destDir = uploadDir;
 
     // Determine destination based on field name
@@ -31,7 +31,7 @@ const storage = multer.diskStorage({
 
     cb(null, destDir);
   },
-  filename: (req: Request, file: Express.Multer.File, cb) => {
+  filename: (_req: Request, file: Express.Multer.File, cb) => {
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
     const ext = path.extname(file.originalname);
     const name = path.basename(file.originalname, ext).replace(/\s+/g, '-');
@@ -40,7 +40,7 @@ const storage = multer.diskStorage({
 });
 
 // File filter for documents
-const documentFilter = (req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
+const documentFilter = (_req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
   const allowedTypes = [
     'application/pdf',
     'application/msword',
@@ -57,7 +57,7 @@ const documentFilter = (req: Request, file: Express.Multer.File, cb: FileFilterC
 };
 
 // File filter for images
-const imageFilter = (req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
+const imageFilter = (_req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
   const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
 
   if (allowedTypes.includes(file.mimetype)) {

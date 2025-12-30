@@ -20,7 +20,7 @@ class MockMediaRecorder {
   ondataavailable: ((event: any) => void) | null = null;
   onstop: (() => void) | null = null;
 
-  constructor(stream: any, options: any) {}
+  constructor(_stream: any, _options: any) {}
 
   start() {
     this.state = 'recording';

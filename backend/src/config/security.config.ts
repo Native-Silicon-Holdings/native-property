@@ -205,12 +205,10 @@ export function getSecurityHeaders() {
     frameguard: {
       action: 'deny',
     },
-    xssFilter: true,
-    noSniff: true,
     referrerPolicy: {
-      policy: 'strict-origin-when-cross-origin',
+      policy: 'strict-origin-when-cross-origin' as const,
     },
-  };
+  } as const;
 }
 
 /**
@@ -254,7 +252,7 @@ export function getRateLimitConfig() {
     standardHeaders: true,
     legacyHeaders: false,
     // Skip rate limiting in test environment
-    skip: (req: any) => process.env.NODE_ENV === 'test',
+    skip: (_req: any) => process.env.NODE_ENV === 'test',
   };
 }
 

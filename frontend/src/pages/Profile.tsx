@@ -1,5 +1,5 @@
 import { useAuth } from '../contexts/AuthContext';
-import { User, Mail, Phone, Building } from 'lucide-react';
+import { User, Mail, Phone } from 'lucide-react';
 
 const Profile = () => {
   const { user } = useAuth();

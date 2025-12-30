@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../services/prisma.service';
 import { sendSuccess, sendError, sendNotFound } from '../utils/response.util';
-import { MeetingType, MeetingStatus, RSVPStatus } from '@prisma/client';
+import { MeetingType, RSVPStatus } from '@prisma/client';
 
 /**
  * Get all meetings with filters
