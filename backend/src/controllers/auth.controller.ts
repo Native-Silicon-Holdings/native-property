@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
 import prisma from '../services/prisma.service';
 import { hashPassword, comparePassword, validatePasswordStrength } from '../utils/password.util';
-import { generateToken } from '../utils/jwt.util';
+import { generateToken, generateRefreshToken, REFRESH_TOKEN_EXPIRES_IN_DAYS } from '../utils/jwt.util';
+import { storeRefreshToken } from '../utils/refresh-token.util';
 import { sendSuccess, sendError, sendUnauthorized } from '../utils/response.util';
 
 /**
@@ -54,12 +55,42 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       }
     });
 
-    // Generate token
+    // Generate tokens
     const token = generateToken({
       userId: user.id,
       email: user.email,
       role: user.role
     });
+    const refreshToken = generateRefreshToken();
+    storeRefreshToken(refreshToken, user.id, REFRESH_TOKEN_EXPIRES_IN_DAYS);
+
+    // Create property ownership if propertyId provided
+    if (propertyId) {
+      await prisma.propertyOwnership.create({
+        data: {
+          propertyId,
+          userId: user.id,
+          ownershipType: 'PRIMARY',
+          isActive: true
+        }
+      });
+      
+      // Update property's current primary owner
+      await prisma.property.update({
+        where: { id: propertyId },
+        data: { currentPrimaryOwnerId: user.id }
+      });
+    }
+
+    // Set account activation based on role (HOMEOWNER/TENANT inactive by default)
+    const shouldBeActive = !['HOMEOWNER', 'TENANT'].includes(user.role);
+    if (!shouldBeActive) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { isActive: false }
+      });
+      user.isActive = false;
+    }
 
     // Log activity
     await prisma.activityLog.create({
@@ -72,7 +103,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       }
     });
 
-    sendSuccess(res, 'User registered successfully', { user, token }, 201);
+    sendSuccess(res, 'User registered successfully', { user, token, refreshToken }, 201);
   } catch (error: any) {
     console.error('Registration error:', error);
     sendError(res, 'Failed to register user', error.message, 500);
@@ -119,18 +150,20 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       data: { lastLogin: new Date() }
     });
 
-    // Generate token
+    // Generate tokens
     const token = generateToken({
       userId: user.id,
       email: user.email,
       role: user.role
     });
+    const refreshToken = generateRefreshToken();
+    storeRefreshToken(refreshToken, user.id, REFRESH_TOKEN_EXPIRES_IN_DAYS);
 
     // Log activity
     await prisma.activityLog.create({
       data: {
         userId: user.id,
-        action: 'USER_LOGIN',
+        action: 'LOGIN',
         module: 'AUTH',
         details: { email: user.email },
         ipAddress: req.ip
@@ -140,7 +173,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     // Remove password hash from response
     const { passwordHash, ...userWithoutPassword } = user;
 
-    sendSuccess(res, 'Login successful', { user: userWithoutPassword, token });
+    sendSuccess(res, 'Login successful', { user: userWithoutPassword, token, refreshToken });
   } catch (error: any) {
     console.error('Login error:', error);
     sendError(res, 'Failed to login', error.message, 500);
@@ -157,10 +190,26 @@ export const getProfile = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
+    // Get current primary property from ownership
+    const primaryOwnership = await prisma.propertyOwnership.findFirst({
+      where: {
+        userId: req.user.userId,
+        ownershipType: 'PRIMARY',
+        isActive: true
+      },
+      include: {
+        property: true
+      },
+      orderBy: {
+        startDate: 'desc'
+      }
+    });
+
     const user = await prisma.user.findUnique({
       where: { id: req.user.userId },
       include: {
-        property: true
+        property: true,
+        directorProfile: true
       }
     });
 
@@ -169,7 +218,13 @@ export const getProfile = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    sendSuccess(res, 'Profile retrieved successfully', user);
+    // Add currentPrimaryProperty if exists
+    const userWithProperty = {
+      ...user,
+      currentPrimaryProperty: primaryOwnership?.property || null
+    };
+
+    sendSuccess(res, 'Profile retrieved successfully', { user: userWithProperty });
   } catch (error: any) {
     console.error('Get profile error:', error);
     sendError(res, 'Failed to get profile', error.message, 500);
@@ -286,5 +341,89 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
   } catch (error: any) {
     console.error('Change password error:', error);
     sendError(res, 'Failed to change password', error.message, 500);
+  }
+};
+
+/**
+ * Refresh access token
+ */
+export const refresh = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      sendError(res, 'Refresh token is required', null, 400);
+      return;
+    }
+
+    const { verifyRefreshToken } = await import('../utils/refresh-token.util');
+    const userId = verifyRefreshToken(refreshToken);
+
+    if (!userId) {
+      sendUnauthorized(res, 'Invalid or expired refresh token');
+      return;
+    }
+
+    // Get user
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        isActive: true
+      }
+    });
+
+    if (!user || !user.isActive) {
+      sendUnauthorized(res, 'User not found or inactive');
+      return;
+    }
+
+    // Generate new access token
+    const token = generateToken({
+      userId: user.id,
+      email: user.email,
+      role: user.role
+    });
+
+    sendSuccess(res, 'Token refreshed successfully', { token });
+  } catch (error: any) {
+    console.error('Refresh token error:', error);
+    sendError(res, 'Failed to refresh token', error.message, 500);
+  }
+};
+
+/**
+ * Logout user
+ */
+export const logout = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      sendUnauthorized(res, 'Not authenticated');
+      return;
+    }
+
+    // Revoke refresh tokens (if provided)
+    const { refreshToken } = req.body;
+    if (refreshToken) {
+      const { revokeRefreshToken } = await import('../utils/refresh-token.util');
+      revokeRefreshToken(refreshToken);
+    }
+
+    // Log activity
+    await prisma.activityLog.create({
+      data: {
+        userId: req.user.userId,
+        action: 'LOGOUT',
+        module: 'AUTH',
+        ipAddress: req.ip
+      }
+    });
+
+    sendSuccess(res, 'Logged out successfully');
+  } catch (error: any) {
+    console.error('Logout error:', error);
+    sendError(res, 'Failed to logout', error.message, 500);
   }
 };

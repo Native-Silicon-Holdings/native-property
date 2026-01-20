@@ -1,0 +1,25 @@
+# Production Docker Compose Override
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# This file uses images from the Docker registry instead of building locally
+#
+# Set these environment variables:
+#   DOCKER_REGISTRY=192.168.88.199:6800
+#   VERSION=latest (or specific version tag)
+
+services:
+  # Backend API - using registry image
+  backend:
+    image: ${DOCKER_REGISTRY:-192.168.88.199:6800}/estate-management-backend:${VERSION:-latest}
+    # Note: When image is specified, build directive from base compose is ignored
+    restart: always
+    environment:
+      NODE_ENV: production
+    # Production-specific overrides can be added here
+
+  # Frontend - using registry image
+  frontend:
+    image: ${DOCKER_REGISTRY:-192.168.88.199:6800}/estate-management-frontend:${VERSION:-latest}
+    # Note: When image is specified, build directive from base compose is ignored
+    restart: always
+    # Production-specific overrides can be added here
+

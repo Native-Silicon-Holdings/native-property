@@ -105,6 +105,21 @@ export const getMeetingById = async (req: Request, res: Response): Promise<void>
               }
             }
           }
+        },
+        resolutions: {
+          include: {
+            proposer: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true
+              }
+            }
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
         }
       }
     });
@@ -370,5 +385,227 @@ export const deleteMeeting = async (req: Request, res: Response): Promise<void> 
   } catch (error: any) {
     console.error('Delete meeting error:', error);
     sendError(res, 'Failed to delete meeting', error.message, 500);
+  }
+};
+
+/**
+ * Record attendance for specific user
+ */
+export const recordUserAttendance = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { meetingId, userId } = req.params;
+    const { actualAttendance } = req.body;
+
+    const attendance = await prisma.meetingAttendance.upsert({
+      where: {
+        meetingId_userId: {
+          meetingId,
+          userId
+        }
+      },
+      create: {
+        meetingId,
+        userId,
+        actualAttendance: actualAttendance === true
+      },
+      update: {
+        actualAttendance: actualAttendance === true
+      }
+    });
+
+    sendSuccess(res, 'Attendance recorded successfully', attendance);
+  } catch (error: any) {
+    console.error('Record user attendance error:', error);
+    sendError(res, 'Failed to record attendance', error.message, 500);
+  }
+};
+
+/**
+ * Get meeting attendance
+ */
+export const getAttendance = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { meetingId } = req.params;
+
+    const attendance = await prisma.meetingAttendance.findMany({
+      where: { meetingId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'asc'
+      }
+    });
+
+    sendSuccess(res, 'Attendance retrieved successfully', { attendance });
+  } catch (error: any) {
+    console.error('Get attendance error:', error);
+    sendError(res, 'Failed to get attendance', error.message, 500);
+  }
+};
+
+/**
+ * Create resolution
+ */
+export const createResolution = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      sendError(res, 'Not authenticated', null, 401);
+      return;
+    }
+
+    const { meetingId } = req.params;
+    const { title, description } = req.body;
+
+    // Check meeting exists and is scheduled
+    const meeting = await prisma.meeting.findUnique({
+      where: { id: meetingId }
+    });
+
+    if (!meeting) {
+      sendError(res, 'Meeting not found', null, 404);
+      return;
+    }
+
+    const resolution = await prisma.resolution.create({
+      data: {
+        meetingId,
+        title,
+        description,
+        proposedBy: req.user.userId
+      },
+      include: {
+        proposer: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    sendSuccess(res, 'Resolution created successfully', { resolution }, 201);
+  } catch (error: any) {
+    console.error('Create resolution error:', error);
+    sendError(res, 'Failed to create resolution', error.message, 500);
+  }
+};
+
+/**
+ * Vote on resolution
+ */
+export const voteOnResolution = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      sendError(res, 'Not authenticated', null, 401);
+      return;
+    }
+
+    const { resolutionId } = req.params;
+    const { vote } = req.body;
+
+    if (!['FOR', 'AGAINST', 'ABSTAIN'].includes(vote)) {
+      sendError(res, 'Invalid vote. Must be FOR, AGAINST, or ABSTAIN', null, 400);
+      return;
+    }
+
+    // Get resolution with meeting
+    const resolution = await prisma.resolution.findUnique({
+      where: { id: resolutionId },
+      include: {
+        meeting: true
+      }
+    });
+
+    if (!resolution) {
+      sendError(res, 'Resolution not found', null, 404);
+      return;
+    }
+
+    // Check meeting is scheduled
+    if (resolution.meeting.status !== 'SCHEDULED') {
+      sendError(res, 'Voting on resolutions is only allowed while meeting is scheduled', null, 400);
+      return;
+    }
+
+    // Update vote counts
+    const updateData: any = {};
+    if (vote === 'FOR') {
+      updateData.votesFor = { increment: 1 };
+    } else if (vote === 'AGAINST') {
+      updateData.votesAgainst = { increment: 1 };
+    } else if (vote === 'ABSTAIN') {
+      updateData.votesAbstain = { increment: 1 };
+    }
+
+    const updatedResolution = await prisma.resolution.update({
+      where: { id: resolutionId },
+      data: updateData
+    });
+
+    sendSuccess(res, 'Vote recorded successfully', { resolution: updatedResolution });
+  } catch (error: any) {
+    console.error('Vote on resolution error:', error);
+    sendError(res, 'Failed to vote on resolution', error.message, 500);
+  }
+};
+
+/**
+ * Get resolution results
+ */
+export const getResolutionResults = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { resolutionId } = req.params;
+
+    const resolution = await prisma.resolution.findUnique({
+      where: { id: resolutionId },
+      include: {
+        meeting: {
+          select: {
+            id: true,
+            title: true,
+            scheduledDate: true,
+            status: true
+          }
+        },
+        proposer: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    if (!resolution) {
+      sendError(res, 'Resolution not found', null, 404);
+      return;
+    }
+
+    const totalVotes = resolution.votesFor + resolution.votesAgainst + resolution.votesAbstain;
+
+    sendSuccess(res, 'Resolution results retrieved successfully', {
+      resolution: {
+        ...resolution,
+        totalVotes,
+        forPercentage: totalVotes > 0 ? ((resolution.votesFor / totalVotes) * 100).toFixed(2) : '0',
+        againstPercentage: totalVotes > 0 ? ((resolution.votesAgainst / totalVotes) * 100).toFixed(2) : '0',
+        abstainPercentage: totalVotes > 0 ? ((resolution.votesAbstain / totalVotes) * 100).toFixed(2) : '0'
+      }
+    });
+  } catch (error: any) {
+    console.error('Get resolution results error:', error);
+    sendError(res, 'Failed to get resolution results', error.message, 500);
   }
 };

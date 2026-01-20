@@ -19,8 +19,12 @@ const createValidation = [
 ];
 
 // Routes
+router.get('/my-properties', propertyController.getMyProperties);
 router.get('/', propertyController.getProperties);
 router.get('/:id', propertyController.getPropertyById);
+router.get('/:id/history', propertyController.getPropertyHistory);
+router.get('/:id/owners', propertyController.getPropertyOwners);
+router.get('/:id/access-requests', propertyController.getAccessRequests);
 
 router.post(
   '/',
@@ -29,10 +33,21 @@ router.post(
   propertyController.createProperty
 );
 
+router.post(
+  '/:id/transfer',
+  propertyController.initiateTransfer
+);
+
 router.put(
   '/:id',
   authorize('DIRECTOR', 'MANAGER'),
   propertyController.updateProperty
+);
+
+router.put(
+  '/access-requests/:requestId/approve',
+  authorize('DIRECTOR', 'MANAGER'),
+  propertyController.approveAccessRequest
 );
 
 router.delete(

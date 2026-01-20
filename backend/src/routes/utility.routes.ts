@@ -53,4 +53,6 @@ router.post(
   utilityController.recordPayment
 );
 
+router.get('/billing/:propertyId', utilityController.getBillingSummary);
+
 export default router;

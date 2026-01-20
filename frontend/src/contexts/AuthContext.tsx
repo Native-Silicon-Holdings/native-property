@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { authApi, User, ApiResponse } from '../services/api';
-import { AxiosResponse } from 'axios';
+import { authApi, User } from '../services/api';
 
 interface AuthContextType {
   user: User | null;
@@ -49,10 +48,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const verifyToken = async () => {
     try {
-      const response: AxiosResponse<ApiResponse<User>> = await authApi.getProfile();
-      if (response.data.success && response.data.data) {
-        setUser(response.data.data);
-        localStorage.setItem('user', JSON.stringify(response.data.data));
+      const response = await authApi.getProfile();
+      if (response.data.success && response.data.data?.user) {
+        const userData = response.data.data.user;
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
       }
     } catch (error) {
       // Token is invalid
@@ -63,14 +63,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const login = async (email: string, password: string) => {
-    const response: AxiosResponse<ApiResponse<{ user: User; token: string }>> =
-      await authApi.login({ email, password });
+    const response = await authApi.login({ email, password });
 
     if (response.data.success && response.data.data) {
-      const { user, token } = response.data.data;
+      const { user, token, refreshToken } = response.data.data;
       setUser(user);
       setToken(token);
       localStorage.setItem('token', token);
+      localStorage.setItem('refreshToken', refreshToken);
       localStorage.setItem('user', JSON.stringify(user));
     } else {
       throw new Error(response.data.message || 'Login failed');
@@ -95,33 +95,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       throw new Error(data.message || 'Facial authentication failed');
     }
 
-    const { user, token } = data.data;
+    const { user, token, refreshToken } = data.data;
     setUser(user);
     setToken(token);
     localStorage.setItem('token', token);
+    localStorage.setItem('refreshToken', refreshToken || '');
     localStorage.setItem('user', JSON.stringify(user));
   };
 
   const register = async (data: any) => {
-    const response: AxiosResponse<ApiResponse<{ user: User; token: string }>> =
-      await authApi.register(data);
+    const response = await authApi.register(data);
 
     if (response.data.success && response.data.data) {
-      const { user, token } = response.data.data;
+      const { user, token, refreshToken } = response.data.data;
       setUser(user);
       setToken(token);
       localStorage.setItem('token', token);
+      localStorage.setItem('refreshToken', refreshToken);
       localStorage.setItem('user', JSON.stringify(user));
     } else {
       throw new Error(response.data.message || 'Registration failed');
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+  const logout = async () => {
+    const refreshToken = localStorage.getItem('refreshToken');
+    try {
+      if (refreshToken) {
+        await authApi.logout({ refreshToken });
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+    }
   };
 
   const updateUser = (updatedUser: User) => {

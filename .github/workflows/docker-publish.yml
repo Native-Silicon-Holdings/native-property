@@ -1,0 +1,131 @@
+name: Build and push Docker images
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*" ]
+  workflow_dispatch:
+    inputs:
+      registry:
+        description: "Container registry hostname (e.g. ghcr.io, docker.io, 192.168.1.10:5000)"
+        required: false
+        default: "192.168.88.199:6800"
+      vite_api_url:
+        description: "Frontend build arg VITE_API_URL"
+        required: false
+        default: "http://localhost:5000/api"
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  PROJECT_NAME: estate-management
+  BACKEND_CONTEXT: ./backend
+  FRONTEND_CONTEXT: ./frontend
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set registry + image prefixes
+        id: vars
+        shell: bash
+        run: |
+          set -euo pipefail
+          REGISTRY="${{ inputs.registry }}"
+          if [ -z "$REGISTRY" ]; then
+            REGISTRY="192.168.88.199:6800"
+          fi
+
+          REGISTRY="$(echo "$REGISTRY" | tr '[:upper:]' '[:lower:]')"
+
+          # For GHCR we include the owner namespace (ghcr.io/<owner>/image),
+          # for typical self-hosted registries we push directly (registry/image).
+          if [ "$REGISTRY" = "ghcr.io" ]; then
+            OWNER="$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
+            PREFIX="$REGISTRY/$OWNER"
+          else
+            PREFIX="$REGISTRY"
+          fi
+
+          echo "registry=$REGISTRY" >> "$GITHUB_OUTPUT"
+          echo "image_prefix=$PREFIX" >> "$GITHUB_OUTPUT"
+          echo "backend_image=$PREFIX/${{ env.PROJECT_NAME }}-backend" >> "$GITHUB_OUTPUT"
+          echo "frontend_image=$PREFIX/${{ env.PROJECT_NAME }}-frontend" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Login strategy:
+      # - For GHCR: use GITHUB_TOKEN by default
+      # - For other registries: set secrets REGISTRY_USERNAME and REGISTRY_PASSWORD
+      - name: Login to GHCR
+        if: ${{ steps.vars.outputs.registry == 'ghcr.io' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ steps.vars.outputs.registry }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to custom registry
+        if: ${{ steps.vars.outputs.registry != 'ghcr.io' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ steps.vars.outputs.registry }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Docker metadata (backend)
+        id: meta_backend
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ steps.vars.outputs.backend_image }}
+          tags: |
+            type=ref,event=tag
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Docker metadata (frontend)
+        id: meta_frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ steps.vars.outputs.frontend_image }}
+          tags: |
+            type=ref,event=tag
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ env.BACKEND_CONTEXT }}
+          file: ${{ env.BACKEND_CONTEXT }}/Dockerfile
+          push: true
+          tags: ${{ steps.meta_backend.outputs.tags }}
+          labels: ${{ steps.meta_backend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ env.FRONTEND_CONTEXT }}
+          file: ${{ env.FRONTEND_CONTEXT }}/Dockerfile
+          push: true
+          build-args: |
+            VITE_API_URL=${{ inputs.vite_api_url }}
+          tags: ${{ steps.meta_frontend.outputs.tags }}
+          labels: ${{ steps.meta_frontend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+

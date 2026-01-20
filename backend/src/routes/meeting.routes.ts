@@ -50,6 +50,32 @@ router.post(
   meetingController.recordAttendance
 );
 
+router.get(
+  '/:meetingId/attendance',
+  meetingController.getAttendance
+);
+
+router.put(
+  '/:meetingId/attendance/:userId',
+  authorize('DIRECTOR', 'MANAGER'),
+  meetingController.recordUserAttendance
+);
+
+router.post(
+  '/:meetingId/resolutions',
+  meetingController.createResolution
+);
+
+router.post(
+  '/resolutions/:resolutionId/vote',
+  meetingController.voteOnResolution
+);
+
+router.get(
+  '/resolutions/:resolutionId/results',
+  meetingController.getResolutionResults
+);
+
 router.delete(
   '/:id',
   authorize('DIRECTOR'),

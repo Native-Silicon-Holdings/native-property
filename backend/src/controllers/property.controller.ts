@@ -222,3 +222,424 @@ export const deleteProperty = async (req: Request, res: Response): Promise<void>
     sendError(res, 'Failed to delete property', error.message, 500);
   }
 };
+
+/**
+ * Get user's accessible properties
+ */
+export const getMyProperties = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      sendError(res, 'Not authenticated', null, 401);
+      return;
+    }
+
+    const userId = req.user.userId;
+    const isAdmin = ['DIRECTOR', 'MANAGER'].includes(req.user.role);
+
+    let properties;
+
+    if (isAdmin) {
+      // Admins see all properties
+      properties = await prisma.property.findMany({
+        include: {
+          ownerships: {
+            where: {
+              isActive: true
+            },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true
+                }
+              }
+            }
+          }
+        },
+        orderBy: {
+          unitNumber: 'asc'
+        }
+      });
+    } else {
+      // Regular users see only their properties
+      const ownerships = await prisma.propertyOwnership.findMany({
+        where: {
+          userId,
+          isActive: true
+        },
+        include: {
+          property: {
+            include: {
+              ownerships: {
+                where: {
+                  isActive: true
+                },
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      email: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      properties = ownerships.map(o => o.property);
+    }
+
+    sendSuccess(res, 'Properties retrieved successfully', { properties });
+  } catch (error: any) {
+    console.error('Get my properties error:', error);
+    sendError(res, 'Failed to get properties', error.message, 500);
+  }
+};
+
+/**
+ * Get property history
+ */
+export const getPropertyHistory = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      sendError(res, 'Not authenticated', null, 401);
+      return;
+    }
+
+    const { id } = req.params;
+    const { category, startDate, endDate } = req.query;
+
+    // Check access
+    const isAdmin = ['DIRECTOR', 'MANAGER'].includes(req.user.role);
+    if (!isAdmin) {
+      const hasAccess = await prisma.propertyOwnership.findFirst({
+        where: {
+          propertyId: id,
+          userId: req.user.userId,
+          isActive: true
+        }
+      });
+
+      if (!hasAccess) {
+        sendError(res, 'Access denied', null, 403);
+        return;
+      }
+    }
+
+    const property = await prisma.property.findUnique({
+      where: { id },
+      include: {
+        ownerships: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true
+              }
+            }
+          },
+          orderBy: {
+            startDate: 'desc'
+          }
+        }
+      }
+    });
+
+    if (!property) {
+      sendError(res, 'Property not found', null, 404);
+      return;
+    }
+
+    // Get current primary owner
+    const currentOwner = property.ownerships.find(o => o.ownershipType === 'PRIMARY' && o.isActive);
+
+    // Get records based on category
+    const records: any = {};
+
+    if (!category || category === 'utility') {
+      const where: any = { propertyId: id };
+      if (startDate) where.readingDate = { gte: new Date(startDate as string) };
+      if (endDate) where.readingDate = { ...where.readingDate, lte: new Date(endDate as string) };
+      records.utilityReadings = await prisma.utilityReading.findMany({
+        where,
+        orderBy: { readingDate: 'desc' }
+      });
+    }
+
+    if (!category || category === 'maintenance') {
+      records.maintenanceRequests = await prisma.maintenanceRequest.findMany({
+        where: { propertyId: id },
+        orderBy: { submittedAt: 'desc' }
+      });
+    }
+
+    if (!category || category === 'documents') {
+      records.documents = await prisma.document.findMany({
+        where: { isArchived: false },
+        orderBy: { uploadedAt: 'desc' },
+        take: 20
+      });
+    }
+
+    sendSuccess(res, 'Property history retrieved successfully', {
+      property: {
+        ...property,
+        currentOwner: currentOwner ? {
+          ...currentOwner.user,
+          ownershipType: currentOwner.ownershipType,
+          startDate: currentOwner.startDate
+        } : null
+      },
+      records
+    });
+  } catch (error: any) {
+    console.error('Get property history error:', error);
+    sendError(res, 'Failed to get property history', error.message, 500);
+  }
+};
+
+/**
+ * Get property owners
+ */
+export const getPropertyOwners = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      sendError(res, 'Not authenticated', null, 401);
+      return;
+    }
+
+    const { id } = req.params;
+
+    // Check access
+    const isAdmin = ['DIRECTOR', 'MANAGER'].includes(req.user.role);
+    if (!isAdmin) {
+      const hasAccess = await prisma.propertyOwnership.findFirst({
+        where: {
+          propertyId: id,
+          userId: req.user.userId,
+          isActive: true
+        }
+      });
+
+      if (!hasAccess) {
+        sendError(res, 'Access denied', null, 403);
+        return;
+      }
+    }
+
+    const ownerships = await prisma.propertyOwnership.findMany({
+      where: { propertyId: id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phoneNumber: true
+          }
+        }
+      },
+      orderBy: {
+        startDate: 'desc'
+      }
+    });
+
+    sendSuccess(res, 'Property owners retrieved successfully', { ownerships });
+  } catch (error: any) {
+    console.error('Get property owners error:', error);
+    sendError(res, 'Failed to get property owners', error.message, 500);
+  }
+};
+
+/**
+ * Initiate property transfer
+ */
+export const initiateTransfer = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      sendError(res, 'Not authenticated', null, 401);
+      return;
+    }
+
+    const { id } = req.params;
+    const { newOwnerEmail, transferDate, recordsToTransfer } = req.body;
+
+    // Check if user is current primary owner
+    const currentOwnership = await prisma.propertyOwnership.findFirst({
+      where: {
+        propertyId: id,
+        userId: req.user.userId,
+        ownershipType: 'PRIMARY',
+        isActive: true
+      }
+    });
+
+    if (!currentOwnership) {
+      sendError(res, 'Only the current primary owner can initiate transfer', null, 403);
+      return;
+    }
+
+    // Create access request
+    const accessRequest = await prisma.propertyAccessRequest.create({
+      data: {
+        propertyId: id,
+        requestedByUserId: req.user.userId,
+        requestedForEmail: newOwnerEmail,
+        requestedRecords: recordsToTransfer || ['utility', 'maintenance', 'documents'],
+        status: 'PENDING',
+        transferDate: transferDate ? new Date(transferDate) : null
+      }
+    });
+
+    sendSuccess(res, 'Property transfer request created successfully', { accessRequest }, 201);
+  } catch (error: any) {
+    console.error('Initiate transfer error:', error);
+    sendError(res, 'Failed to initiate transfer', error.message, 500);
+  }
+};
+
+/**
+ * Get property access requests
+ */
+export const getAccessRequests = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      sendError(res, 'Not authenticated', null, 401);
+      return;
+    }
+
+    const { id } = req.params;
+
+    // Check access
+    const isAdmin = ['DIRECTOR', 'MANAGER'].includes(req.user.role);
+    if (!isAdmin) {
+      const hasAccess = await prisma.propertyOwnership.findFirst({
+        where: {
+          propertyId: id,
+          userId: req.user.userId,
+          isActive: true
+        }
+      });
+
+      if (!hasAccess) {
+        sendError(res, 'Access denied', null, 403);
+        return;
+      }
+    }
+
+    const accessRequests = await prisma.propertyAccessRequest.findMany({
+      where: { propertyId: id },
+      include: {
+        requestedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    sendSuccess(res, 'Access requests retrieved successfully', { accessRequests });
+  } catch (error: any) {
+    console.error('Get access requests error:', error);
+    sendError(res, 'Failed to get access requests', error.message, 500);
+  }
+};
+
+/**
+ * Approve/reject access request
+ */
+export const approveAccessRequest = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      sendError(res, 'Not authenticated', null, 401);
+      return;
+    }
+
+    const { requestId } = req.params;
+    const { status, adminNotes } = req.body;
+
+    if (!['DIRECTOR', 'MANAGER'].includes(req.user.role)) {
+      sendError(res, 'Only admins can approve access requests', null, 403);
+      return;
+    }
+
+    const accessRequest = await prisma.propertyAccessRequest.findUnique({
+      where: { id: requestId }
+    });
+
+    if (!accessRequest) {
+      sendError(res, 'Access request not found', null, 404);
+      return;
+    }
+
+    // Update request
+    const updatedRequest = await prisma.propertyAccessRequest.update({
+      where: { id: requestId },
+      data: {
+        status,
+        adminNotes,
+        processedByUserId: req.user.userId,
+        processedAt: new Date()
+      }
+    });
+
+    // If approved, create ownership and transfer
+    if (status === 'APPROVED') {
+      // Find user by email
+      const newOwner = await prisma.user.findUnique({
+        where: { email: accessRequest.requestedForEmail }
+      });
+
+      if (newOwner) {
+        // Deactivate old ownerships
+        await prisma.propertyOwnership.updateMany({
+          where: {
+            propertyId: accessRequest.propertyId,
+            isActive: true
+          },
+          data: {
+            isActive: false,
+            endDate: new Date()
+          }
+        });
+
+        // Create new PRIMARY ownership
+        await prisma.propertyOwnership.create({
+          data: {
+            propertyId: accessRequest.propertyId,
+            userId: newOwner.id,
+            ownershipType: 'PRIMARY',
+            isActive: true,
+            startDate: accessRequest.transferDate || new Date()
+          }
+        });
+
+        // Update property's current primary owner
+        await prisma.property.update({
+          where: { id: accessRequest.propertyId },
+          data: { currentPrimaryOwnerId: newOwner.id }
+        });
+      }
+    }
+
+    sendSuccess(res, 'Access request processed successfully', { accessRequest: updatedRequest });
+  } catch (error: any) {
+    console.error('Approve access request error:', error);
+    sendError(res, 'Failed to process access request', error.message, 500);
+  }
+};

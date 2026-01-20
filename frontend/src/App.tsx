@@ -18,6 +18,11 @@ import Properties from './pages/properties/Properties';
 import PropertyDetail from './pages/properties/PropertyDetail';
 import Users from './pages/users/Users';
 import Profile from './pages/Profile';
+import FinancialDashboard from './pages/financial/FinancialDashboard';
+import Directors from './pages/directors/Directors';
+import Elections from './pages/elections/Elections';
+import ElectionDetail from './pages/elections/ElectionDetail';
+import Voting from './pages/voting/Voting';
 
 // Protected Route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -96,6 +101,19 @@ function AppRoutes() {
 
         {/* Users */}
         <Route path="users" element={<Users />} />
+
+        {/* Financial */}
+        <Route path="financial" element={<FinancialDashboard />} />
+
+        {/* Directors */}
+        <Route path="directors" element={<Directors />} />
+
+        {/* Elections */}
+        <Route path="elections" element={<Elections />} />
+        <Route path="elections/:id" element={<ElectionDetail />} />
+
+        {/* Voting */}
+        <Route path="voting/:electionId" element={<Voting />} />
       </Route>
 
       {/* Catch all */}

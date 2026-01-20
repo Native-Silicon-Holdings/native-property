@@ -33,6 +33,10 @@ import meetingRoutes from './routes/meeting.routes';
 import maintenanceRoutes from './routes/maintenance.routes';
 import propertyRoutes from './routes/property.routes';
 import userRoutes from './routes/user.routes';
+import financialRoutes from './routes/financial.routes';
+import directorRoutes from './routes/director.routes';
+import electionRoutes from './routes/election.routes';
+import votingRoutes from './routes/voting.routes';
 
 // Import middleware
 import { auditLogger } from './middleware/audit-logging.middleware';
@@ -125,6 +129,10 @@ app.use(`${API_VERSION}/meetings`, meetingRoutes);
 app.use(`${API_VERSION}/maintenance`, maintenanceRoutes);
 app.use(`${API_VERSION}/properties`, propertyRoutes);
 app.use(`${API_VERSION}/users`, userRoutes);
+app.use(`${API_VERSION}/financial`, financialRoutes);
+app.use(`${API_VERSION}/directors`, directorRoutes);
+app.use(`${API_VERSION}/elections`, electionRoutes);
+app.use(`${API_VERSION}/voting`, votingRoutes);
 
 // Legacy routes (for backward compatibility)
 // TODO: Remove after frontend migration to v1
@@ -137,6 +145,10 @@ app.use('/api/meetings', meetingRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/properties', propertyRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/financial', financialRoutes);
+app.use('/api/directors', directorRoutes);
+app.use('/api/elections', electionRoutes);
+app.use('/api/voting', votingRoutes);
 
 // ==================== ERROR HANDLING ====================
 

@@ -375,3 +375,78 @@ export const recordPayment = async (req: Request, res: Response): Promise<void> 
     sendError(res, 'Failed to record payment', error.message, 500);
   }
 };
+
+/**
+ * Get billing summary for a property
+ */
+export const getBillingSummary = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { propertyId } = req.params;
+
+    // Find current OPEN billing cycle (most recent startDate)
+    const billingCycle = await prisma.billingCycle.findFirst({
+      where: {
+        status: 'OPEN'
+      },
+      orderBy: {
+        startDate: 'desc'
+      }
+    });
+
+    if (!billingCycle) {
+      sendError(res, 'No open billing cycle found', null, 404);
+      return;
+    }
+
+    // Get readings within cycle
+    const readings = await prisma.utilityReading.findMany({
+      where: {
+        propertyId,
+        readingDate: {
+          gte: billingCycle.startDate,
+          lte: billingCycle.endDate
+        }
+      },
+      orderBy: {
+        readingDate: 'desc'
+      }
+    });
+
+    // Get payments within cycle
+    const payments = await prisma.payment.findMany({
+      where: {
+        propertyId,
+        paymentDate: {
+          gte: billingCycle.startDate,
+          lte: billingCycle.endDate
+        }
+      },
+      orderBy: {
+        paymentDate: 'desc'
+      }
+    });
+
+    // Calculate totals
+    const totalConsumption = readings.reduce((sum, r) => sum + Number(r.consumption), 0);
+    const totalAmount = readings.reduce((sum, r) => sum + Number(r.amount), 0);
+    const totalPaid = payments
+      .filter(p => p.status === 'CLEARED')
+      .reduce((sum, p) => sum + Number(p.amount), 0);
+    const outstanding = totalAmount - totalPaid;
+
+    sendSuccess(res, 'Billing summary retrieved successfully', {
+      billingCycle,
+      readings,
+      payments,
+      summary: {
+        totalConsumption,
+        totalAmount,
+        totalPaid,
+        outstanding
+      }
+    });
+  } catch (error: any) {
+    console.error('Get billing summary error:', error);
+    sendError(res, 'Failed to get billing summary', error.message, 500);
+  }
+};

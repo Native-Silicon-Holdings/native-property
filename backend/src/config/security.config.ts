@@ -216,12 +216,21 @@ export function getSecurityHeaders() {
  */
 export function getCorsConfig() {
   const config = getSecurityConfig();
+  const isDevelopment = process.env.NODE_ENV === 'development';
 
   return {
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
       // Allow requests with no origin (mobile apps, Postman, etc.)
       if (!origin) return callback(null, true);
 
+      // In development, allow all localhost origins (any port)
+      if (isDevelopment) {
+        if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+          return callback(null, true);
+        }
+      }
+
+      // Check against configured allowed origins
       if (config.allowedOrigins.includes(origin) || config.allowedOrigins.includes('*')) {
         callback(null, true);
       } else {
