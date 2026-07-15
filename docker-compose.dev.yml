@@ -1,25 +1,10 @@
-# Development override for docker-compose
+# Development override for docker-compose (Supabase-native)
 # Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# Backend and Postgres are RETIRED. Frontend connects directly to shared Supabase.
+# Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in ./frontend/.env
 
 services:
-  postgres:
-    ports:
-      - "5432:5432"
-
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.dev
-    environment:
-      NODE_ENV: development
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
-      - backend_uploads:/app/uploads
-    ports:
-      - "${BACKEND_PORT:-5000}:5000"
-    command: sh -c "npx prisma generate && npm run dev"
-
   frontend:
     build:
       context: ./frontend
