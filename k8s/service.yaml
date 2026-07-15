@@ -1,0 +1,17 @@
+# =============================================================================
+# Service — native-property frontend
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: native-property
+  namespace: native-property
+  labels:
+    app: native-property
+spec:
+  selector:
+    app: native-property
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

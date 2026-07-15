@@ -1,0 +1,33 @@
+# =============================================================================
+# Ingress — native-property (subdomain TBD: property.nativesilicon.co.za)
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: native-property
+  namespace: native-property
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+  labels:
+    app: native-property
+    app.kubernetes.io/name: native-property
+    app.kubernetes.io/part-of: native-silicon
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - property.nativesilicon.co.za
+      secretName: native-property-tls
+  rules:
+    - host: property.nativesilicon.co.za
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: native-property
+                port:
+                  name: http

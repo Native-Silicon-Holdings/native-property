@@ -1,0 +1,52 @@
+# =============================================================================
+# Deployment — native-property frontend (nginx static SPA)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: native-property
+  namespace: native-property
+  labels:
+    app: native-property
+    app.kubernetes.io/name: native-property
+    app.kubernetes.io/part-of: native-silicon
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: native-property
+  template:
+    metadata:
+      labels:
+        app: native-property
+    spec:
+      containers:
+        - name: frontend
+          image: registry.internal:6800/native-property-frontend:latest
+          ports:
+            - containerPort: 80
+              name: http
+          envFrom:
+            - secretRef:
+                name: native-property-secrets
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      imagePullSecrets:
+        - name: registry-credentials

@@ -1,0 +1,10 @@
+# =============================================================================
+# native-property Namespace
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: native-property
+  labels:
+    app.kubernetes.io/name: native-property
+    app.kubernetes.io/part-of: native-silicon
