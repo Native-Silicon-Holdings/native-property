@@ -1,0 +1,22 @@
+-- =============================================================================
+-- PostgREST Configuration for native_property schema
+-- =============================================================================
+-- This must be applied AFTER the schema is created on the shared Supabase
+-- instance (001_create_native_property_schema.sql).
+--
+-- Add 'native_property' to PGRST_DB_SCHEMAS in:
+--   k8s-fleet/supabase/supabase-values.yaml
+--
+-- CRITICAL: The schema MUST exist in Postgres BEFORE PostgREST references it.
+-- If PostgREST starts with a schema that doesn't exist, the ENTIRE REST API
+-- breaks (all schemas become inaccessible). This happened in native-one#174.
+--
+-- Safe deployment order:
+--   1. Run 001_create_native_property_schema.sql on the shared Postgres
+--   2. Verify: SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'native_property';
+--   3. Update PGRST_DB_SCHEMAS to include 'native_property'
+--   4. Restart PostgREST (or wait for config reload)
+--   5. Verify: curl https://your-supabase-url/rest/v1/ | jq '.[] | select(.name == "native_property")'
+--
+-- See native-one#174's incident notes for the full outage timeline.
+-- =============================================================================
