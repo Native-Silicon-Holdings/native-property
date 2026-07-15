@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { FacialAuthProvider } from './contexts/FacialAuthContext';
 import Layout from './components/layout/Layout';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
@@ -68,13 +69,13 @@ function AppRoutes() {
       {/* Public routes */}
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
-      <Route path="/facial-auth" element={<PublicRoute><FacialAuthPage /></PublicRoute>} />
 
       {/* Protected routes */}
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="profile" element={<Profile />} />
+        <Route path="facial-verification" element={<FacialAuthPage />} />
 
         {/* Documents */}
         <Route path="documents" element={<Documents />} />
@@ -126,7 +127,9 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <AppRoutes />
+        <FacialAuthProvider>
+          <AppRoutes />
+        </FacialAuthProvider>
       </AuthProvider>
     </Router>
   );

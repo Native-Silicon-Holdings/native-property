@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX, Camera, CameraOff, CheckCircle, AlertCircle } from 'lucide-react';
+import { useFacialAuth } from '../../contexts/FacialAuthContext';
 
 interface ComplianceVerificationProps {
   verificationId: string;
@@ -12,6 +13,8 @@ const ComplianceVerification: React.FC<ComplianceVerificationProps> = ({
   onVerificationComplete,
   onCancel,
 }) => {
+  const { uploadVideo, checkStatus } = useFacialAuth();
+
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -106,26 +109,12 @@ const ComplianceVerification: React.FC<ComplianceVerificationProps> = ({
     }
   };
 
-  // Upload recorded video to backend
+  // Upload recorded video via the facial auth context (Supabase Storage + RPC)
   const uploadVerificationVideo = async (blob: Blob) => {
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('video', blob, `verification-${verificationId}.webm`);
-
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/facial-auth/upload/${verificationId}`,
-        {
-          method: 'POST',
-          body: formData,
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Upload failed');
-      }
+      const file = new File([blob], `verification-${verificationId}.webm`, { type: 'video/webm' });
+      await uploadVideo(verificationId, file);
 
       setVerificationComplete(true);
 
@@ -144,26 +133,22 @@ const ComplianceVerification: React.FC<ComplianceVerificationProps> = ({
     const maxAttempts = 30; // 30 seconds max
     let attempts = 0;
 
-    const checkStatus = async () => {
+    const poll = async () => {
       try {
-        const response = await fetch(
-          `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/facial-auth/status/${verificationId}`
-        );
-        const data = await response.json();
+        const status = await checkStatus(verificationId);
 
-        if (data.success && data.data.verification.status === 'VERIFIED') {
-          // Verification successful!
+        if (status === 'VERIFIED') {
           onVerificationComplete(verificationId);
           return;
-        } else if (data.data.verification.status === 'FAILED') {
-          setError(data.data.verification.failureReason || 'Verification failed. Please try again.');
+        } else if (status === 'FAILED' || status === 'EXPIRED') {
+          setError('Verification failed. Please try again.');
           return;
         }
 
         // Continue polling if still processing
         attempts++;
         if (attempts < maxAttempts) {
-          setTimeout(checkStatus, 1000);
+          setTimeout(poll, 1000);
         } else {
           setError('Verification timeout. Please try again.');
         }
@@ -173,7 +158,7 @@ const ComplianceVerification: React.FC<ComplianceVerificationProps> = ({
       }
     };
 
-    checkStatus();
+    poll();
   };
 
   // Play compliance video

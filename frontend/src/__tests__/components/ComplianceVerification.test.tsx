@@ -2,8 +2,15 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ComplianceVerification from '../../components/auth/ComplianceVerification';
 
-// Mock fetch
-global.fetch = vi.fn();
+// Mock the facial auth context (component now uploads/polls through it, not fetch)
+const mockUploadVideo = vi.fn();
+const mockCheckStatus = vi.fn();
+vi.mock('../../contexts/FacialAuthContext', () => ({
+  useFacialAuth: () => ({
+    uploadVideo: mockUploadVideo,
+    checkStatus: mockCheckStatus,
+  }),
+}));
 
 // Mock MediaDevices
 const mockGetUserMedia = vi.fn();
@@ -42,7 +49,8 @@ describe('ComplianceVerification', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetUserMedia.mockReset();
-    (global.fetch as any).mockReset();
+    mockUploadVideo.mockReset();
+    mockCheckStatus.mockReset();
   });
 
   const renderComponent = () => {
@@ -183,13 +191,7 @@ describe('ComplianceVerification', () => {
       .mockResolvedValueOnce(mockAudioStream)
       .mockResolvedValueOnce(mockVideoStream);
 
-    (global.fetch as any).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        success: true,
-        data: { verificationId: mockVerificationId, status: 'PROCESSING' },
-      }),
-    });
+    mockUploadVideo.mockResolvedValueOnce(undefined);
 
     renderComponent();
 
@@ -213,18 +215,8 @@ describe('ComplianceVerification', () => {
       .mockResolvedValueOnce(mockVideoStream);
 
     // Mock slow upload
-    (global.fetch as any).mockImplementationOnce(
-      () =>
-        new Promise((resolve) =>
-          setTimeout(
-            () =>
-              resolve({
-                ok: true,
-                json: async () => ({ success: true, data: {} }),
-              }),
-            100
-          )
-        )
+    mockUploadVideo.mockImplementationOnce(
+      () => new Promise((resolve) => setTimeout(resolve, 100))
     );
 
     renderComponent();
@@ -241,7 +233,7 @@ describe('ComplianceVerification', () => {
       .mockResolvedValueOnce(mockAudioStream)
       .mockResolvedValueOnce(mockVideoStream);
 
-    (global.fetch as any).mockRejectedValueOnce(new Error('Network error'));
+    mockUploadVideo.mockRejectedValueOnce(new Error('Network error'));
 
     renderComponent();
 
@@ -303,23 +295,9 @@ describe('ComplianceVerification', () => {
       .mockResolvedValueOnce(mockAudioStream)
       .mockResolvedValueOnce(mockVideoStream);
 
-    // Mock successful upload
-    (global.fetch as any)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          success: true,
-          data: { verificationId: mockVerificationId },
-        }),
-      })
-      // Mock successful status check
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          success: true,
-          data: { verification: { status: 'VERIFIED' } },
-        }),
-      });
+    // Mock successful upload and status check
+    mockUploadVideo.mockResolvedValueOnce(undefined);
+    mockCheckStatus.mockResolvedValueOnce('VERIFIED');
 
     renderComponent();
 

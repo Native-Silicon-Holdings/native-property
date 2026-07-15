@@ -1,113 +1,13 @@
-import axios, { AxiosInstance, AxiosError } from 'axios';
+import { supabase } from '../lib/supabase';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// =============================================================================
+// Re-export supabase client for convenience
+// =============================================================================
+export { supabase } from '../lib/supabase';
 
-// Create axios instance
-const api: AxiosInstance = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Request interceptor to add auth token
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor to handle errors and refresh tokens
-let isRefreshing = false;
-let failedQueue: Array<{
-  resolve: (value?: any) => void;
-  reject: (reason?: any) => void;
-}> = [];
-
-const processQueue = (error: any, token: string | null = null) => {
-  failedQueue.forEach((prom) => {
-    if (error) {
-      prom.reject(error);
-    } else {
-      prom.resolve(token);
-    }
-  });
-  failedQueue = [];
-};
-
-api.interceptors.response.use(
-  (response) => response,
-  async (error: AxiosError) => {
-    const originalRequest = error.config as any;
-
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        })
-          .then((token) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-            return api(originalRequest);
-          })
-          .catch((err) => {
-            return Promise.reject(err);
-          });
-      }
-
-      originalRequest._retry = true;
-      isRefreshing = true;
-
-      const refreshToken = localStorage.getItem('refreshToken');
-      if (!refreshToken) {
-        processQueue(error, null);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('refreshToken');
-        window.location.href = '/login';
-        return Promise.reject(error);
-      }
-
-      try {
-        const response = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
-        const { token } = response.data.data;
-        localStorage.setItem('token', token);
-        processQueue(null, token);
-        originalRequest.headers.Authorization = `Bearer ${token}`;
-        return api(originalRequest);
-      } catch (err) {
-        processQueue(err, null);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('refreshToken');
-        window.location.href = '/login';
-        return Promise.reject(err);
-      } finally {
-        isRefreshing = false;
-      }
-    }
-
-    return Promise.reject(error);
-  }
-);
-
-export default api;
-
-// API response type
-export interface ApiResponse<T = any> {
-  success: boolean;
-  message: string;
-  data?: T;
-  errors?: any;
-}
-
-// User types
+// =============================================================================
+// Types
+// =============================================================================
 export interface User {
   id: string;
   email: string;
@@ -124,6 +24,7 @@ export interface User {
 
 export interface Property {
   id: string;
+  organizationId: string;
   unitNumber: string;
   address: string;
   propertyType: 'HOUSE' | 'APARTMENT' | 'TOWNHOUSE' | 'COMMERCIAL';
@@ -131,155 +32,885 @@ export interface Property {
   occupants: number;
 }
 
-// Auth API
-export const authApi = {
-  register: (data: any) => api.post<ApiResponse<{ user: User; token: string; refreshToken: string }>>('/auth/register', data),
-  login: (data: { email: string; password: string }) =>
-    api.post<ApiResponse<{ user: User; token: string; refreshToken: string }>>('/auth/login', data),
-  refresh: (data: { refreshToken: string }) => api.post<ApiResponse<{ token: string }>>('/auth/refresh', data),
-  logout: (data?: { refreshToken?: string }) => api.post<ApiResponse>('/auth/logout', data),
-  getProfile: () => api.get<ApiResponse<{ user: User }>>('/auth/profile'),
-  updateProfile: (data: any) => api.put<ApiResponse<User>>('/auth/profile', data),
-  changePassword: (data: { currentPassword: string; newPassword: string }) =>
-    api.post<ApiResponse>('/auth/change-password', data),
-};
-
-// Document API
+// =============================================================================
+// Document API — direct Supabase queries
+// =============================================================================
 export const documentApi = {
-  getAll: (params?: any) => api.get<ApiResponse>('/documents', { params }),
-  getById: (id: string) => api.get<ApiResponse>(`/documents/${id}`),
-  upload: (formData: FormData) => api.post<ApiResponse>('/documents', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
-  update: (id: string, data: any) => api.put<ApiResponse>(`/documents/${id}`, data),
-  uploadVersion: (id: string, formData: FormData) =>
-    api.post<ApiResponse>(`/documents/${id}/version`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    }),
-  delete: (id: string) => api.delete<ApiResponse>(`/documents/${id}`),
+  getAll: async (params?: { category?: string; search?: string; limit?: number; offset?: number }) => {
+    let query = supabase
+      .schema('native_property')
+      .from('documents')
+      .select('*', { count: 'exact' })
+      .order('uploaded_at', { ascending: false });
+
+    if (params?.category) query = query.eq('category', params.category);
+    if (params?.search) query = query.or(`title.ilike.%${params.search}%,description.ilike.%${params.search}%`);
+    if (params?.limit) query = query.range(params.offset || 0, (params.offset || 0) + params.limit - 1);
+
+    return query;
+  },
+
+  getById: async (id: string) => {
+    return supabase
+      .schema('native_property')
+      .from('documents')
+      .select('*, document_versions(*)')
+      .eq('id', id)
+      .single();
+  },
+
+  upload: async (data: { title: string; description?: string; category: string; file_url: string; file_size: number; tags?: string[]; uploaded_by_id: string }) => {
+    return supabase
+      .schema('native_property')
+      .from('documents')
+      .insert(data)
+      .select()
+      .single();
+  },
+
+  update: async (id: string, data: { title?: string; description?: string; category?: string; approval_status?: string }) => {
+    return supabase
+      .schema('native_property')
+      .from('documents')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single();
+  },
+
+  uploadVersion: async (documentId: string, data: { file_url: string; change_notes?: string; uploaded_by_id: string; version: number }) => {
+    return supabase
+      .schema('native_property')
+      .from('document_versions')
+      .insert({ ...data, document_id: documentId })
+      .select()
+      .single();
+  },
+
+  delete: async (id: string) => {
+    return supabase
+      .schema('native_property')
+      .from('documents')
+      .delete()
+      .eq('id', id);
+  },
 };
 
-// Announcement API
+// =============================================================================
+// Announcement API — direct Supabase queries
+// =============================================================================
 export const announcementApi = {
-  getAll: (params?: any) => api.get<ApiResponse>('/announcements', { params }),
-  getById: (id: string) => api.get<ApiResponse>(`/announcements/${id}`),
-  create: (data: any) => api.post<ApiResponse>('/announcements', data),
-  update: (id: string, data: any) => api.put<ApiResponse>(`/announcements/${id}`, data),
-  acknowledge: (id: string) => api.post<ApiResponse>(`/announcements/${id}/acknowledge`),
-  delete: (id: string) => api.delete<ApiResponse>(`/announcements/${id}`),
+  getAll: async (params?: { category?: string; priority?: string; limit?: number; offset?: number }) => {
+    let query = supabase
+      .schema('native_property')
+      .from('announcements')
+      .select('*, announcement_reads(user_id, acknowledged)', { count: 'exact' })
+      .order('posted_at', { ascending: false });
+
+    if (params?.category) query = query.eq('category', params.category);
+    if (params?.priority) query = query.eq('priority', params.priority);
+    if (params?.limit) query = query.range(params.offset || 0, (params.offset || 0) + params.limit - 1);
+
+    return query;
+  },
+
+  getById: async (id: string) => {
+    return supabase
+      .schema('native_property')
+      .from('announcements')
+      .select('*, announcement_reads(user_id, acknowledged, read_at)')
+      .eq('id', id)
+      .single();
+  },
+
+  create: async (data: { title: string; content: string; category: string; priority?: string; is_pinned?: boolean; requires_acknowledgment?: boolean; posted_by_id: string }) => {
+    return supabase
+      .schema('native_property')
+      .from('announcements')
+      .insert(data)
+      .select()
+      .single();
+  },
+
+  update: async (id: string, data: { title?: string; content?: string; category?: string; priority?: string; is_pinned?: boolean }) => {
+    return supabase
+      .schema('native_property')
+      .from('announcements')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single();
+  },
+
+  acknowledge: async (announcementId: string, userId: string) => {
+    return supabase
+      .schema('native_property')
+      .from('announcement_reads')
+      .upsert({ announcement_id: announcementId, user_id: userId, acknowledged: true })
+      .select()
+      .single();
+  },
+
+  delete: async (id: string) => {
+    return supabase
+      .schema('native_property')
+      .from('announcements')
+      .delete()
+      .eq('id', id);
+  },
 };
 
-// Utility API
+// =============================================================================
+// Utility API — direct Supabase queries for reads, RPC for writes
+// =============================================================================
 export const utilityApi = {
-  getReadings: (params?: any) => api.get<ApiResponse>('/utilities/readings', { params }),
-  getConsumption: (propertyId: string, params?: any) =>
-    api.get<ApiResponse>(`/utilities/consumption/${propertyId}`, { params }),
-  addReading: (data: any) => api.post<ApiResponse>('/utilities/readings', data),
-  bulkImport: (data: any) => api.post<ApiResponse>('/utilities/readings/bulk', data),
-  getPayments: (params?: any) => api.get<ApiResponse>('/utilities/payments', { params }),
-  recordPayment: (data: any) => api.post<ApiResponse>('/utilities/payments', data),
-  getBilling: (propertyId: string) => api.get<ApiResponse>(`/utilities/billing/${propertyId}`),
+  getReadings: async (params?: { property_id?: string; utility_type?: string; limit?: number; offset?: number }) => {
+    let query = supabase
+      .schema('native_property')
+      .from('utility_readings')
+      .select('*, properties!inner(organization_id)', { count: 'exact' })
+      .order('reading_date', { ascending: false });
+
+    if (params?.property_id) query = query.eq('property_id', params.property_id);
+    if (params?.utility_type) query = query.eq('utility_type', params.utility_type);
+    if (params?.limit) query = query.range(params.offset || 0, (params.offset || 0) + params.limit - 1);
+
+    return query;
+  },
+
+  getConsumption: async (propertyId: string, params?: { utility_type?: string }) => {
+    let query = supabase
+      .schema('native_property')
+      .from('utility_readings')
+      .select('*')
+      .eq('property_id', propertyId)
+      .order('reading_date', { ascending: false });
+
+    if (params?.utility_type) query = query.eq('utility_type', params.utility_type);
+
+    return query;
+  },
+
+  addReading: async (data: {
+    property_id: string;
+    utility_type: string;
+    reading_date: string;
+    meter_reading: number;
+    previous_reading: number;
+    rate: number;
+  }) => {
+    return supabase.rpc('rpc_add_utility_reading', {
+      p_property_id: data.property_id,
+      p_utility_type: data.utility_type,
+      p_reading_date: data.reading_date,
+      p_meter_reading: data.meter_reading,
+      p_previous_reading: data.previous_reading,
+      p_rate: data.rate,
+    });
+  },
+
+  bulkImport: async (readings: Array<{
+    property_id: string;
+    utility_type: string;
+    reading_date: string;
+    meter_reading: number;
+    previous_reading: number;
+    rate: number;
+  }>) => {
+    const results = [];
+    for (const reading of readings) {
+      const result = await utilityApi.addReading(reading);
+      results.push(result);
+    }
+    return results;
+  },
+
+  getPayments: async (params?: { property_id?: string; limit?: number; offset?: number }) => {
+    let query = supabase
+      .schema('native_property')
+      .from('payments')
+      .select('*, properties!inner(organization_id)', { count: 'exact' })
+      .order('payment_date', { ascending: false });
+
+    if (params?.property_id) query = query.eq('property_id', params.property_id);
+    if (params?.limit) query = query.range(params.offset || 0, (params.offset || 0) + params.limit - 1);
+
+    return query;
+  },
+
+  recordPayment: async (data: {
+    property_id: string;
+    amount: number;
+    payment_date: string;
+    payment_method: string;
+    reference: string;
+    allocated_to?: any;
+    receipt_url?: string;
+  }) => {
+    return supabase.rpc('rpc_record_payment', {
+      p_property_id: data.property_id,
+      p_amount: data.amount,
+      p_payment_date: data.payment_date,
+      p_payment_method: data.payment_method,
+      p_reference: data.reference,
+      p_allocated_to: data.allocated_to || {},
+      p_receipt_url: data.receipt_url,
+    });
+  },
+
+  getBilling: async (propertyId: string) => {
+    return supabase
+      .schema('native_property')
+      .from('billing_cycles')
+      .select('*')
+      .order('start_date', { ascending: false })
+      .limit(1)
+      .single();
+  },
 };
 
-// Meeting API
+// =============================================================================
+// Meeting API — direct Supabase queries for reads, RPC for writes
+// =============================================================================
 export const meetingApi = {
-  getAll: (params?: any) => api.get<ApiResponse>('/meetings', { params }),
-  getById: (id: string) => api.get<ApiResponse>(`/meetings/${id}`),
-  create: (data: any) => api.post<ApiResponse>('/meetings', data),
-  update: (id: string, data: any) => api.put<ApiResponse>(`/meetings/${id}`, data),
-  rsvp: (id: string, data: any) => api.post<ApiResponse>(`/meetings/${id}/rsvp`, data),
-  getAttendance: (meetingId: string) => api.get<ApiResponse>(`/meetings/${meetingId}/attendance`),
-  recordAttendance: (id: string, data: any) =>
-    api.post<ApiResponse>(`/meetings/${id}/attendance`, data),
-  recordUserAttendance: (meetingId: string, userId: string, data: any) =>
-    api.put<ApiResponse>(`/meetings/${meetingId}/attendance/${userId}`, data),
-  createResolution: (meetingId: string, data: any) => api.post<ApiResponse>(`/meetings/${meetingId}/resolutions`, data),
-  voteOnResolution: (resolutionId: string, data: any) => api.post<ApiResponse>(`/meetings/resolutions/${resolutionId}/vote`, data),
-  getResolutionResults: (resolutionId: string) => api.get<ApiResponse>(`/meetings/resolutions/${resolutionId}/results`),
-  delete: (id: string) => api.delete<ApiResponse>(`/meetings/${id}`),
+  getAll: async (params?: { type?: string; status?: string; limit?: number; offset?: number }) => {
+    let query = supabase
+      .schema('native_property')
+      .from('meetings')
+      .select('*, meeting_attendance(*)', { count: 'exact' })
+      .order('scheduled_date', { ascending: false });
+
+    if (params?.type) query = query.eq('type', params.type);
+    if (params?.status) query = query.eq('status', params.status);
+    if (params?.limit) query = query.range(params.offset || 0, (params.offset || 0) + params.limit - 1);
+
+    return query;
+  },
+
+  getById: async (id: string) => {
+    return supabase
+      .schema('native_property')
+      .from('meetings')
+      .select('*, meeting_attendance(*), resolutions(*)')
+      .eq('id', id)
+      .single();
+  },
+
+  create: async (data: { title: string; type: string; description?: string; scheduled_date: string; location: string; required_quorum?: number; created_by_id: string }) => {
+    return supabase
+      .schema('native_property')
+      .from('meetings')
+      .insert(data)
+      .select()
+      .single();
+  },
+
+  update: async (id: string, data: { title?: string; status?: string; minutes_url?: string; description?: string }) => {
+    return supabase
+      .schema('native_property')
+      .from('meetings')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single();
+  },
+
+  rsvp: async (meetingId: string, userId: string, rsvpStatus: string) => {
+    return supabase
+      .schema('native_property')
+      .from('meeting_attendance')
+      .upsert({ meeting_id: meetingId, user_id: userId, rsvp_status: rsvpStatus })
+      .select()
+      .single();
+  },
+
+  getAttendance: async (meetingId: string) => {
+    return supabase
+      .schema('native_property')
+      .from('meeting_attendance')
+      .select('*')
+      .eq('meeting_id', meetingId);
+  },
+
+  recordAttendance: async (meetingId: string, attendees: Array<{ user_id: string; actual_attendance: boolean }>) => {
+    return supabase
+      .schema('native_property')
+      .from('meeting_attendance')
+      .upsert(
+        attendees.map((a) => ({ meeting_id: meetingId, ...a })),
+        { onConflict: 'meeting_id,user_id' }
+      );
+  },
+
+  createResolution: async (meetingId: string, data: { title: string; description: string; proposed_by: string }) => {
+    return supabase
+      .schema('native_property')
+      .from('resolutions')
+      .insert({ meeting_id: meetingId, ...data })
+      .select()
+      .single();
+  },
+
+  voteOnResolution: async (resolutionId: string, vote: 'for' | 'against' | 'abstain') => {
+    return supabase.rpc('rpc_vote_on_resolution', {
+      p_resolution_id: resolutionId,
+      p_vote: vote,
+    });
+  },
+
+  getResolutionResults: async (resolutionId: string) => {
+    return supabase
+      .schema('native_property')
+      .from('resolutions')
+      .select('votes_for, votes_against, votes_abstain')
+      .eq('id', resolutionId)
+      .single();
+  },
+
+  delete: async (id: string) => {
+    return supabase
+      .schema('native_property')
+      .from('meetings')
+      .delete()
+      .eq('id', id);
+  },
 };
 
-// Property API
+// =============================================================================
+// Property API — direct Supabase queries
+// =============================================================================
 export const propertyApi = {
-  getMyProperties: () => api.get<ApiResponse>('/properties/my-properties'),
-  getAll: (params?: any) => api.get<ApiResponse>('/properties', { params }),
-  getById: (id: string) => api.get<ApiResponse>(`/properties/${id}`),
-  getHistory: (id: string, params?: any) => api.get<ApiResponse>(`/properties/${id}/history`, { params }),
-  getOwners: (id: string) => api.get<ApiResponse>(`/properties/${id}/owners`),
-  getAccessRequests: (id: string) => api.get<ApiResponse>(`/properties/${id}/access-requests`),
-  create: (data: any) => api.post<ApiResponse>('/properties', data),
-  initiateTransfer: (id: string, data: any) => api.post<ApiResponse>(`/properties/${id}/transfer`, data),
-  approveAccessRequest: (requestId: string, data: any) => api.put<ApiResponse>(`/properties/access-requests/${requestId}/approve`, data),
-  update: (id: string, data: any) => api.put<ApiResponse>(`/properties/${id}`, data),
-  delete: (id: string) => api.delete<ApiResponse>(`/properties/${id}`),
+  getMyProperties: async () => {
+    return supabase
+      .schema('native_property')
+      .from('properties')
+      .select('*, property_ownerships!inner(user_id, ownership_type, is_active)')
+      .eq('property_ownerships.is_active', true);
+  },
+
+  getAll: async (params?: { property_type?: string; search?: string; limit?: number; offset?: number }) => {
+    let query = supabase
+      .schema('native_property')
+      .from('properties')
+      .select('*, users:property_ownerships!inner(user_id, ownership_type, is_active)', { count: 'exact' })
+      .order('created_at', { ascending: false });
+
+    if (params?.property_type) query = query.eq('property_type', params.property_type);
+    if (params?.search) query = query.or(`unit_number.ilike.%${params.search}%,address.ilike.%${params.search}%`);
+    if (params?.limit) query = query.range(params.offset || 0, (params.offset || 0) + params.limit - 1);
+
+    return query;
+  },
+
+  getById: async (id: string) => {
+    return supabase
+      .schema('native_property')
+      .from('properties')
+      .select('*, property_ownerships(*), utility_readings(*)')
+      .eq('id', id)
+      .single();
+  },
+
+  getHistory: async (id: string) => {
+    return supabase
+      .schema('native_property')
+      .from('property_ownerships')
+      .select('*')
+      .eq('property_id', id)
+      .order('start_date', { ascending: false });
+  },
+
+  getOwners: async (id: string) => {
+    return supabase
+      .schema('native_property')
+      .from('property_ownerships')
+      .select('*')
+      .eq('property_id', id)
+      .eq('is_active', true);
+  },
+
+  getAccessRequests: async (id: string) => {
+    return supabase
+      .schema('native_property')
+      .from('property_access_requests')
+      .select('*')
+      .eq('property_id', id)
+      .order('created_at', { ascending: false });
+  },
+
+  create: async (data: { organization_id: string; unit_number: string; address: string; property_type: string; square_meters: number; occupants?: number }) => {
+    return supabase
+      .schema('native_property')
+      .from('properties')
+      .insert(data)
+      .select()
+      .single();
+  },
+
+  initiateTransfer: async (propertyId: string, data: { requested_for_email: string; requested_records: string[] }) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    return supabase
+      .schema('native_property')
+      .from('property_access_requests')
+      .insert({
+        property_id: propertyId,
+        requested_by_user_id: user?.id,
+        requested_for_email: data.requested_for_email,
+        requested_records: data.requested_records,
+      })
+      .select()
+      .single();
+  },
+
+  approveAccessRequest: async (requestId: string, adminNotes?: string) => {
+    return supabase.rpc('rpc_approve_access_request', {
+      p_request_id: requestId,
+      p_admin_notes: adminNotes,
+    });
+  },
+
+  update: async (id: string, data: { address?: string; property_type?: string; square_meters?: number; occupants?: number }) => {
+    return supabase
+      .schema('native_property')
+      .from('properties')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single();
+  },
+
+  delete: async (id: string) => {
+    return supabase
+      .schema('native_property')
+      .from('properties')
+      .delete()
+      .eq('id', id);
+  },
 };
 
-// User API
+// =============================================================================
+// User API — direct Supabase queries on core schema
+// =============================================================================
 export const userApi = {
-  getAll: (params?: any) => api.get<ApiResponse>('/users', { params }),
-  getById: (id: string) => api.get<ApiResponse>(`/users/${id}`),
-  create: (data: any) => api.post<ApiResponse>('/users', data),
-  update: (id: string, data: any) => api.put<ApiResponse>(`/users/${id}`, data),
-  delete: (id: string) => api.delete<ApiResponse>(`/users/${id}`),
-  getActivity: (id: string, params?: any) =>
-    api.get<ApiResponse>(`/users/${id}/activity`, { params }),
+  getAll: async (params?: { role?: string; limit?: number; offset?: number }) => {
+    let query = supabase
+      .schema('core')
+      .from('users')
+      .select('*', { count: 'exact' });
+
+    if (params?.role) query = query.eq('role', params.role);
+    if (params?.limit) query = query.range(params.offset || 0, (params.offset || 0) + params.limit - 1);
+
+    return query;
+  },
+
+  getById: async (id: string) => {
+    return supabase
+      .schema('core')
+      .from('users')
+      .select('*')
+      .eq('id', id)
+      .single();
+  },
+
+  create: async (data: { email: string; first_name: string; last_name: string; phone_number?: string }) => {
+    return supabase.rpc('rpc_create_user', {
+      p_email: data.email,
+      p_first_name: data.first_name,
+      p_last_name: data.last_name,
+      p_phone_number: data.phone_number,
+    });
+  },
+
+  update: async (id: string, data: { first_name?: string; last_name?: string; phone_number?: string; is_active?: boolean }) => {
+    return supabase.rpc('rpc_update_user', {
+      p_user_id: id,
+      p_first_name: data.first_name,
+      p_last_name: data.last_name,
+      p_phone_number: data.phone_number,
+      p_is_active: data.is_active,
+    });
+  },
+
+  delete: async (id: string) => {
+    return supabase.rpc('rpc_delete_user', { p_user_id: id });
+  },
+
+  getActivity: async (id: string, params?: { limit?: number; offset?: number }) => {
+    let query = supabase
+      .schema('native_property')
+      .from('activity_logs')
+      .select('*')
+      .eq('user_id', id)
+      .order('timestamp', { ascending: false });
+
+    if (params?.limit) query = query.range(params.offset || 0, (params.offset || 0) + params.limit - 1);
+
+    return query;
+  },
 };
 
-// Maintenance API
+// =============================================================================
+// Maintenance API — direct Supabase queries for reads, RPC for admin writes
+// =============================================================================
 export const maintenanceApi = {
-  getAll: (params?: any) => api.get<ApiResponse>('/maintenance', { params }),
-  getById: (id: string) => api.get<ApiResponse>(`/maintenance/${id}`),
-  create: (formData: FormData) => api.post<ApiResponse>('/maintenance', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
-  update: (id: string, data: any) => api.put<ApiResponse>(`/maintenance/${id}`, data),
-  addFeedback: (id: string, data: any) =>
-    api.post<ApiResponse>(`/maintenance/${id}/feedback`, data),
-  getStats: () => api.get<ApiResponse>('/maintenance/stats'),
-  delete: (id: string) => api.delete<ApiResponse>(`/maintenance/${id}`),
+  getAll: async (params?: { status?: string; property_id?: string; limit?: number; offset?: number }) => {
+    let query = supabase
+      .schema('native_property')
+      .from('maintenance_requests')
+      .select('*, properties!inner(organization_id)', { count: 'exact' })
+      .order('submitted_at', { ascending: false });
+
+    if (params?.status) query = query.eq('status', params.status);
+    if (params?.property_id) query = query.eq('property_id', params.property_id);
+    if (params?.limit) query = query.range(params.offset || 0, (params.offset || 0) + params.limit - 1);
+
+    return query;
+  },
+
+  getById: async (id: string) => {
+    return supabase
+      .schema('native_property')
+      .from('maintenance_requests')
+      .select('*')
+      .eq('id', id)
+      .single();
+  },
+
+  create: async (data: { property_id: string; category: string; priority: string; description: string; photos?: string[]; submitted_by_id: string }) => {
+    return supabase
+      .schema('native_property')
+      .from('maintenance_requests')
+      .insert(data)
+      .select()
+      .single();
+  },
+
+  update: async (id: string, data: { status?: string; assigned_to?: string; estimated_cost?: number; actual_cost?: number; priority?: string }) => {
+    return supabase.rpc('rpc_update_maintenance', {
+      p_request_id: id,
+      p_status: data.status,
+      p_assigned_to: data.assigned_to,
+      p_estimated_cost: data.estimated_cost,
+      p_actual_cost: data.actual_cost,
+      p_priority: data.priority,
+    });
+  },
+
+  addFeedback: async (id: string, data: { rating: number; feedback: string }) => {
+    return supabase
+      .schema('native_property')
+      .from('maintenance_requests')
+      .update({ rating: data.rating, feedback: data.feedback })
+      .eq('id', id)
+      .select()
+      .single();
+  },
+
+  getStats: async () => {
+    return supabase
+      .schema('native_property')
+      .from('maintenance_requests')
+      .select('status, count(*)', { count: 'exact' })
+      .group('status');
+  },
+
+  delete: async (id: string) => {
+    return supabase
+      .schema('native_property')
+      .from('maintenance_requests')
+      .delete()
+      .eq('id', id);
+  },
 };
 
-// Financial API
+// =============================================================================
+// Financial API — direct Supabase queries for reads, RPC for writes
+// =============================================================================
 export const financialApi = {
-  getOverview: (params?: any) => api.get<ApiResponse>('/financial/overview', { params }),
-  createTransaction: (data: any) => api.post<ApiResponse>('/financial/transactions', data),
-  getBudget: (params?: any) => api.get<ApiResponse>('/financial/budget', { params }),
-  createBudget: (data: any) => api.post<ApiResponse>('/financial/budget', data),
-  updateBudget: (id: string, data: any) => api.put<ApiResponse>(`/financial/budget/${id}`, data),
+  getOverview: async (params?: { accounting_period?: string }) => {
+    let query = supabase
+      .schema('native_property')
+      .from('financial_transactions')
+      .select('*')
+      .order('date', { ascending: false });
+
+    if (params?.accounting_period) query = query.eq('accounting_period', params.accounting_period);
+
+    return query;
+  },
+
+  createTransaction: async (data: { date: string; type: string; category: string; description: string; amount: number; reference?: string; attachment_url?: string }) => {
+    return supabase.rpc('rpc_create_transaction', {
+      p_date: data.date,
+      p_type: data.type,
+      p_category: data.category,
+      p_description: data.description,
+      p_amount: data.amount,
+      p_reference: data.reference,
+      p_attachment_url: data.attachment_url,
+    });
+  },
+
+  getBudget: async (params?: { fiscal_year?: number }) => {
+    let query = supabase
+      .schema('native_property')
+      .from('budget_lines')
+      .select('*')
+      .order('category');
+
+    if (params?.fiscal_year) query = query.eq('fiscal_year', params.fiscal_year);
+
+    return query;
+  },
+
+  createBudget: async (data: { fiscal_year: number; category: string; budgeted_amount: number }) => {
+    return supabase.rpc('rpc_create_budget_line', {
+      p_fiscal_year: data.fiscal_year,
+      p_category: data.category,
+      p_budgeted_amount: data.budgeted_amount,
+    });
+  },
+
+  updateBudget: async (id: string, data: { budgeted_amount?: number; spent_amount?: number }) => {
+    return supabase.rpc('rpc_update_budget_line', {
+      p_budget_id: id,
+      p_budgeted_amount: data.budgeted_amount,
+      p_spent_amount: data.spent_amount,
+    });
+  },
 };
 
-// Director API
+// =============================================================================
+// Director API — direct Supabase queries
+// =============================================================================
 export const directorApi = {
-  getAll: () => api.get<ApiResponse>('/directors'),
-  getActive: () => api.get<ApiResponse>('/directors/active'),
-  getExpiring: () => api.get<ApiResponse>('/directors/expiring'),
-  getByPosition: (position: string) => api.get<ApiResponse>(`/directors/position/${position}`),
-  getById: (id: string) => api.get<ApiResponse>(`/directors/${id}`),
-  create: (data: any) => api.post<ApiResponse>('/directors', data),
-  update: (id: string, data: any) => api.put<ApiResponse>(`/directors/${id}`, data),
-  delete: (id: string) => api.delete<ApiResponse>(`/directors/${id}`),
+  getAll: async () => {
+    return supabase
+      .schema('native_property')
+      .from('directors')
+      .select('*')
+      .order('elected_date', { ascending: false });
+  },
+
+  getActive: async () => {
+    return supabase
+      .schema('native_property')
+      .from('directors')
+      .select('*')
+      .eq('is_active', true)
+      .order('term_end_date');
+  },
+
+  getExpiring: async () => {
+    const threeMonthsFromNow = new Date();
+    threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
+    return supabase
+      .schema('native_property')
+      .from('directors')
+      .select('*')
+      .eq('is_active', true)
+      .lte('term_end_date', threeMonthsFromNow.toISOString())
+      .order('term_end_date');
+  },
+
+  getByPosition: async (position: string) => {
+    return supabase
+      .schema('native_property')
+      .from('directors')
+      .select('*')
+      .eq('position', position)
+      .eq('is_active', true);
+  },
+
+  getById: async (id: string) => {
+    return supabase
+      .schema('native_property')
+      .from('directors')
+      .select('*')
+      .eq('id', id)
+      .single();
+  },
+
+  create: async (data: { user_id: string; position: string; elected_date: string; term_end_date: string; portfolio?: string; biography?: string; contact_email?: string }) => {
+    return supabase.rpc('rpc_create_director', {
+      p_user_id: data.user_id,
+      p_position: data.position,
+      p_elected_date: data.elected_date,
+      p_term_end_date: data.term_end_date,
+      p_portfolio: data.portfolio,
+      p_biography: data.biography,
+      p_contact_email: data.contact_email,
+    });
+  },
+
+  update: async (id: string, data: { position?: string; term_end_date?: string; portfolio?: string; biography?: string; is_active?: boolean }) => {
+    return supabase
+      .schema('native_property')
+      .from('directors')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single();
+  },
+
+  delete: async (id: string) => {
+    return supabase
+      .schema('native_property')
+      .from('directors')
+      .delete()
+      .eq('id', id);
+  },
 };
 
-// Election API
+// =============================================================================
+// Election API — direct Supabase queries for reads, RPC for writes
+// =============================================================================
 export const electionApi = {
-  getAll: () => api.get<ApiResponse>('/elections'),
-  getActive: () => api.get<ApiResponse>('/elections/active'),
-  getByStatus: (status: string) => api.get<ApiResponse>(`/elections/status/${status}`),
-  getById: (id: string) => api.get<ApiResponse>(`/elections/${id}`),
-  getResults: (id: string) => api.get<ApiResponse>(`/elections/${id}/results`),
-  create: (data: any) => api.post<ApiResponse>('/elections', data),
-  update: (id: string, data: any) => api.put<ApiResponse>(`/elections/${id}`, data),
-  delete: (id: string) => api.delete<ApiResponse>(`/elections/${id}`),
-  nominate: (electionId: string, data: any) => api.post<ApiResponse>(`/elections/${electionId}/nominate`, data),
-  secondNomination: (candidateId: string) => api.post<ApiResponse>(`/elections/candidates/${candidateId}/second`),
-  withdrawNomination: (candidateId: string) => api.post<ApiResponse>(`/elections/candidates/${candidateId}/withdraw`),
+  getAll: async () => {
+    return supabase
+      .schema('native_property')
+      .from('elections')
+      .select('*, candidates(*)')
+      .order('created_at', { ascending: false });
+  },
+
+  getActive: async () => {
+    return supabase
+      .schema('native_property')
+      .from('elections')
+      .select('*, candidates(*)')
+      .in('status', ['NOMINATIONS_OPEN', 'VOTING_OPEN'])
+      .order('voting_end_date');
+  },
+
+  getByStatus: async (status: string) => {
+    return supabase
+      .schema('native_property')
+      .from('elections')
+      .select('*, candidates(*)')
+      .eq('status', status)
+      .order('created_at', { ascending: false });
+  },
+
+  getById: async (id: string) => {
+    return supabase
+      .schema('native_property')
+      .from('elections')
+      .select('*, candidates(*, vote_choices(*))')
+      .eq('id', id)
+      .single();
+  },
+
+  getResults: async (id: string) => {
+    return supabase
+      .schema('native_property')
+      .from('vote_choices')
+      .select('*, candidates(user_id, position)')
+      .eq('election_id', id)
+      .order('vote_count', { ascending: false });
+  },
+
+  create: async (data: { title: string; description?: string; type: string; nominations_start_date: string; nominations_end_date: string; voting_start_date: string; voting_end_date: string }) => {
+    return supabase.rpc('rpc_create_election', {
+      p_title: data.title,
+      p_description: data.description,
+      p_type: data.type,
+      p_nominations_start: data.nominations_start_date,
+      p_nominations_end: data.nominations_end_date,
+      p_voting_start: data.voting_start_date,
+      p_voting_end: data.voting_end_date,
+    });
+  },
+
+  update: async (id: string, data: { title?: string; description?: string; status?: string }) => {
+    if (data.status) {
+      return supabase.rpc('rpc_update_election_status', {
+        p_election_id: id,
+        p_new_status: data.status,
+      });
+    }
+    return supabase
+      .schema('native_property')
+      .from('elections')
+      .update({ title: data.title, description: data.description })
+      .eq('id', id)
+      .select()
+      .single();
+  },
+
+  delete: async (id: string) => {
+    return supabase
+      .schema('native_property')
+      .from('elections')
+      .delete()
+      .eq('id', id);
+  },
+
+  nominate: async (electionId: string, data: { user_id: string; position: string; statement?: string }) => {
+    return supabase.rpc('rpc_nominate_candidate', {
+      p_election_id: electionId,
+      p_user_id: data.user_id,
+      p_position: data.position,
+      p_statement: data.statement,
+    });
+  },
+
+  secondNomination: async (candidateId: string) => {
+    return supabase.rpc('rpc_second_nomination', { p_candidate_id: candidateId });
+  },
+
+  withdrawNomination: async (candidateId: string) => {
+    return supabase.rpc('rpc_withdraw_nomination', { p_candidate_id: candidateId });
+  },
 };
 
-// Voting API
+// =============================================================================
+// Voting API — RPC-based for all trust-sensitive operations
+// =============================================================================
 export const votingApi = {
-  castVote: (data: any) => api.post<ApiResponse>('/voting/cast', data),
-  getStatus: (electionId: string) => api.get<ApiResponse>(`/voting/status/${electionId}`),
-  verify: (voteId: string) => api.get<ApiResponse>(`/voting/verify/${voteId}`),
-  getResults: (electionId: string) => api.get<ApiResponse>(`/voting/results/${electionId}`),
-  getHistory: () => api.get<ApiResponse>('/voting/history'),
+  castVote: async (data: { election_id: string; candidate_id: string }) => {
+    return supabase.rpc('rpc_cast_vote', {
+      p_election_id: data.election_id,
+      p_candidate_id: data.candidate_id,
+    });
+  },
+
+  getStatus: async (electionId: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: votes } = await supabase
+      .schema('native_property')
+      .from('votes')
+      .select('candidate_id')
+      .eq('election_id', electionId)
+      .eq('user_id', user?.id || '');
+
+    return {
+      hasVoted: (votes?.length || 0) > 0,
+      vote: votes?.[0],
+    };
+  },
+
+  verify: async (voteId: string) => {
+    return supabase.rpc('rpc_verify_vote', { p_vote_id: voteId });
+  },
+
+  getResults: async (electionId: string) => {
+    return supabase
+      .schema('native_property')
+      .from('vote_choices')
+      .select('*, candidates(user_id, position)')
+      .eq('election_id', electionId)
+      .order('vote_count', { ascending: false });
+  },
+
+  getHistory: async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    return supabase
+      .schema('native_property')
+      .from('votes')
+      .select('*, elections(title, status)')
+      .eq('user_id', user?.id || '')
+      .order('created_at', { ascending: false });
+  },
 };

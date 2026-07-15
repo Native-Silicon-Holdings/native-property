@@ -14,6 +14,16 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
+// Mock the Supabase client so AuthProvider doesn't hit the network
+vi.mock('../../lib/supabase', () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+      onAuthStateChange: vi.fn().mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } }),
+    },
+  },
+}));
+
 // Mock the auth context
 vi.mock('../../contexts/AuthContext', async () => {
   const actual = await vi.importActual('../../contexts/AuthContext');

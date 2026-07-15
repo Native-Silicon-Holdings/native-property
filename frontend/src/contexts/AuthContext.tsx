@@ -1,14 +1,30 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { authApi, User } from '../services/api';
+import { Session, User as SupabaseUser } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
+
+export interface User {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phoneNumber?: string;
+  role: 'DIRECTOR' | 'MANAGER' | 'HOMEOWNER' | 'TENANT' | 'ACCOUNTANT';
+  isActive: boolean;
+  emailVerified: boolean;
+  organizationId?: string;
+  property?: any;
+  createdAt: string;
+  lastLogin?: string;
+}
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
+  session: Session | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  loginWithFacialAuth: (verificationId: string) => Promise<void>;
-  register: (data: any) => Promise<void>;
-  logout: () => void;
+  loginWithOAuth: (provider: 'google' | 'github') => Promise<void>;
+  register: (data: { email: string; password: string; firstName: string; lastName: string }) => Promise<void>;
+  logout: () => Promise<void>;
   updateUser: (user: User) => void;
 }
 
@@ -26,126 +42,144 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+/**
+ * Maps a Supabase Auth user + core.users row to the app's User type.
+ */
+function mapSupabaseUser(
+  supabaseUser: SupabaseUser,
+  coreProfile?: { first_name: string; last_name: string; phone_number?: string } | null,
+  orgMember?: { role: string; organization_id: string } | null
+): User {
+  return {
+    id: supabaseUser.id,
+    email: supabaseUser.email || '',
+    firstName: coreProfile?.first_name || supabaseUser.user_metadata?.first_name || '',
+    lastName: coreProfile?.last_name || supabaseUser.user_metadata?.last_name || '',
+    phoneNumber: coreProfile?.phone_number || supabaseUser.user_metadata?.phone_number,
+    role: (orgMember?.role as User['role']) || 'HOMEOWNER',
+    isActive: true,
+    emailVerified: supabaseUser.email_confirmed_at != null,
+    organizationId: orgMember?.organization_id,
+    createdAt: supabaseUser.created_at,
+  };
+}
+
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Load user from localStorage on mount
   useEffect(() => {
-    const storedToken = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
+      if (currentSession?.user) {
+        loadUserProfile(currentSession.user);
+      } else {
+        setLoading(false);
+      }
+    });
 
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
-      // Verify token by fetching profile
-      verifyToken();
-    } else {
-      setLoading(false);
-    }
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, newSession) => {
+        setSession(newSession);
+        if (newSession?.user) {
+          await loadUserProfile(newSession.user);
+        } else {
+          setUser(null);
+          setLoading(false);
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const verifyToken = async () => {
+  const loadUserProfile = async (supabaseUser: SupabaseUser) => {
     try {
-      const response = await authApi.getProfile();
-      if (response.data.success && response.data.data?.user) {
-        const userData = response.data.data.user;
-        setUser(userData);
-        localStorage.setItem('user', JSON.stringify(userData));
-      }
+      // Fetch core.users profile
+      const { data: profile } = await supabase
+        .schema('core')
+        .from('users')
+        .select('first_name, last_name, phone_number')
+        .eq('id', supabaseUser.id)
+        .single();
+
+      // Fetch organization membership
+      const { data: orgMember } = await supabase
+        .schema('core')
+        .from('organization_members')
+        .select('role, organization_id')
+        .eq('user_id', supabaseUser.id)
+        .limit(1)
+        .single();
+
+      setUser(mapSupabaseUser(supabaseUser, profile, orgMember));
     } catch (error) {
-      // Token is invalid
-      logout();
+      console.error('Error loading user profile:', error);
+      setUser(mapSupabaseUser(supabaseUser));
     } finally {
       setLoading(false);
     }
   };
 
   const login = async (email: string, password: string) => {
-    const response = await authApi.login({ email, password });
-
-    if (response.data.success && response.data.data) {
-      const { user, token, refreshToken } = response.data.data;
-      setUser(user);
-      setToken(token);
-      localStorage.setItem('token', token);
-      localStorage.setItem('refreshToken', refreshToken);
-      localStorage.setItem('user', JSON.stringify(user));
-    } else {
-      throw new Error(response.data.message || 'Login failed');
-    }
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    if (data.user) await loadUserProfile(data.user);
   };
 
-  const loginWithFacialAuth = async (verificationId: string) => {
-    const response = await fetch(
-      `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/facial-auth/login`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+  const loginWithOAuth = async (provider: 'google' | 'github') => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/dashboard`,
+      },
+    });
+    if (error) throw error;
+  };
+
+  const register = async (data: { email: string; password: string; firstName: string; lastName: string }) => {
+    const { data: authData, error } = await supabase.auth.signUp({
+      email: data.email,
+      password: data.password,
+      options: {
+        data: {
+          first_name: data.firstName,
+          last_name: data.lastName,
         },
-        body: JSON.stringify({ verificationId }),
-      }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok || !data.success) {
-      throw new Error(data.message || 'Facial authentication failed');
-    }
-
-    const { user, token, refreshToken } = data.data;
-    setUser(user);
-    setToken(token);
-    localStorage.setItem('token', token);
-    localStorage.setItem('refreshToken', refreshToken || '');
-    localStorage.setItem('user', JSON.stringify(user));
-  };
-
-  const register = async (data: any) => {
-    const response = await authApi.register(data);
-
-    if (response.data.success && response.data.data) {
-      const { user, token, refreshToken } = response.data.data;
-      setUser(user);
-      setToken(token);
-      localStorage.setItem('token', token);
-      localStorage.setItem('refreshToken', refreshToken);
-      localStorage.setItem('user', JSON.stringify(user));
-    } else {
-      throw new Error(response.data.message || 'Registration failed');
+      },
+    });
+    if (error) throw error;
+    if (authData.user) {
+      // Create core.users row
+      await supabase.schema('core').from('users').upsert({
+        id: authData.user.id,
+        email: data.email,
+        first_name: data.firstName,
+        last_name: data.lastName,
+      });
+      await loadUserProfile(authData.user);
     }
   };
 
   const logout = async () => {
-    const refreshToken = localStorage.getItem('refreshToken');
-    try {
-      if (refreshToken) {
-        await authApi.logout({ refreshToken });
-      }
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      setUser(null);
-      setToken(null);
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
-    }
+    await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
   };
 
   const updateUser = (updatedUser: User) => {
     setUser(updatedUser);
-    localStorage.setItem('user', JSON.stringify(updatedUser));
   };
 
-  const value = {
+  const value: AuthContextType = {
     user,
-    token,
+    session,
     loading,
     login,
-    loginWithFacialAuth,
+    loginWithOAuth,
     register,
     logout,
     updateUser,
