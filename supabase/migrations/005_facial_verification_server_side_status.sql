@@ -9,32 +9,31 @@
 -- client-inserted with client-supplied `details`, so a user could forge
 -- their own audit trail.
 --
--- Fix: restrict the client's own-row UPDATE policy to the fields it should
--- legitimately set (video_url, metadata during PENDING) and move every
--- outcome-affecting transition into SECURITY DEFINER RPCs. Activity log
--- writes for this flow now happen inside those RPCs, not from the client.
+-- Fix: remove the client's direct UPDATE path on this table entirely and
+-- move every write (video submission included) into SECURITY DEFINER
+-- RPCs. Postgres RLS predicates are row-scoped, not column-scoped — a
+-- policy like `USING/WITH CHECK (status = 'PENDING')` cannot stop a
+-- client from writing verification_score/verified_at/failure_reason
+-- while status stays PENDING, so column allow-listing via RLS alone is
+-- not a safe boundary here. Activity log writes for this flow now
+-- happen inside the RPCs, not from the client.
 --
 -- Depends on: 001, 002, 003
 -- =============================================================================
 
 -- =============================================================================
--- RLS: restrict facial_verifications UPDATE — no client-settable status/score
+-- RLS: remove all client INSERT/UPDATE access to facial_verifications
 -- =============================================================================
+-- rpc_initialize_facial_verification, rpc_submit_facial_verification, and
+-- rpc_complete_facial_verification (all SECURITY DEFINER, running as the
+-- function owner and bypassing RLS) are now the only ways to write to
+-- this table. The prior INSERT policy let a client create its own row
+-- with an arbitrary status/verification_score/verified_at from the
+-- start, bypassing rpc_initialize_facial_verification entirely — so it
+-- is dropped along with the UPDATE policy, not narrowed.
 
+DROP POLICY IF EXISTS "users_can_insert_own_verifications" ON native_property.facial_verifications;
 DROP POLICY IF EXISTS "users_can_update_own_verifications" ON native_property.facial_verifications;
-
--- Clients may still update their own PENDING row's video_url/metadata while
--- uploading (rpc_submit_facial_verification below is the actual path used
--- by the frontend, but this stays in place for direct-write compatibility
--- and is intentionally narrow: it cannot touch status, verification_score,
--- verified_at, or failure_reason, and only applies while still PENDING).
-CREATE POLICY "users_can_update_own_pending_verification_video"
-  ON native_property.facial_verifications FOR UPDATE
-  USING (user_id = auth.uid() AND status = 'PENDING')
-  WITH CHECK (
-    user_id = auth.uid()
-    AND status = 'PENDING'
-  );
 
 -- =============================================================================
 -- RPC: submit a verification video (client-facing, replaces direct UPDATE)
@@ -105,8 +104,12 @@ $$;
 -- =============================================================================
 -- Sets the final VERIFIED/FAILED outcome and score. This must be called by
 -- the face-matching service/backend job using the service role, not by the
--- end user's session — REVOKE EXECUTE from authenticated below enforces
--- that a logged-in user cannot self-approve their own verification.
+-- end user's session — the REVOKE below (from PUBLIC, not just
+-- authenticated/anon) enforces that a logged-in user cannot self-approve
+-- their own verification. New Postgres functions grant EXECUTE to PUBLIC
+-- by default, and authenticated/anon inherit through that PUBLIC grant,
+-- so revoking only from authenticated/anon leaves the PUBLIC grant intact
+-- and the function callable anyway; REVOKE FROM PUBLIC closes that.
 CREATE OR REPLACE FUNCTION native_property.rpc_complete_facial_verification(
   p_verification_id UUID,
   p_status native_property.facial_verification_status,
@@ -162,8 +165,14 @@ $$;
 
 -- Only the service role (face-matching worker/backend job) may complete a
 -- verification. Ordinary authenticated users must not be able to call this.
+-- REVOKE FROM PUBLIC is required: PostgreSQL grants EXECUTE on new
+-- functions to PUBLIC by default, and both authenticated and anon are
+-- members of PUBLIC, so revoking only from those two roles leaves the
+-- PUBLIC grant in place and the function still callable by anyone.
+REVOKE EXECUTE ON FUNCTION native_property.rpc_complete_facial_verification FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION native_property.rpc_complete_facial_verification FROM authenticated;
 REVOKE EXECUTE ON FUNCTION native_property.rpc_complete_facial_verification FROM anon;
+GRANT EXECUTE ON FUNCTION native_property.rpc_complete_facial_verification TO service_role;
 
 -- =============================================================================
 -- RPC: initialize a verification session (client-facing, replaces direct
