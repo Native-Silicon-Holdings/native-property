@@ -21,9 +21,7 @@ const Voting = () => {
   const fetchStatus = async () => {
     try {
       const response = await votingApi.getStatus(electionId!);
-      if (response.data.success && response.data.data) {
-        setStatus(response.data.data);
-      }
+      setStatus(response);
     } catch (error) {
       console.error('Error fetching voting status:', error);
     } finally {
@@ -32,7 +30,7 @@ const Voting = () => {
   };
 
   const handleVote = async () => {
-    if (!selectedCandidate) {
+    if (!selectedCandidate || !electionId) {
       alert('Please select a candidate');
       return;
     }
@@ -40,8 +38,8 @@ const Voting = () => {
     setSubmitting(true);
     try {
       await votingApi.castVote({
-        electionId,
-        candidateId: selectedCandidate,
+        election_id: electionId,
+        candidate_id: selectedCandidate,
       });
       alert('Vote cast successfully!');
       fetchStatus(); // Refresh status

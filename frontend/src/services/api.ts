@@ -263,6 +263,7 @@ export const utilityApi = {
       .schema('native_property')
       .from('billing_cycles')
       .select('*')
+      .eq('property_id', propertyId)
       .order('start_date', { ascending: false })
       .limit(1)
       .single();
@@ -608,11 +609,28 @@ export const maintenanceApi = {
   },
 
   getStats: async () => {
-    return supabase
+    const response = await supabase
       .schema('native_property')
       .from('maintenance_requests')
-      .select('status, count(*)', { count: 'exact' })
-      .group('status');
+      .select('status, submitted_at, resolved_at');
+
+    if (response.error || !response.data) {
+      return response;
+    }
+
+    const byStatus = response.data.reduce<Record<string, number>>((acc, row) => {
+      acc[row.status] = (acc[row.status] || 0) + 1;
+      return acc;
+    }, {});
+
+    const resolutionDays = response.data
+      .filter((row) => row.resolved_at)
+      .map((row) => (new Date(row.resolved_at!).getTime() - new Date(row.submitted_at).getTime()) / 86400000);
+    const averageResolutionDays = resolutionDays.length
+      ? resolutionDays.reduce((sum, d) => sum + d, 0) / resolutionDays.length
+      : 0;
+
+    return { ...response, data: { byStatus, averageResolutionDays } };
   },
 
   delete: async (id: string) => {

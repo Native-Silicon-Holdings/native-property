@@ -29,8 +29,8 @@ const Maintenance = () => {
   const fetchProperties = async () => {
     try {
       const response = await propertyApi.getMyProperties();
-      if (response.data.success && response.data.data) {
-        setProperties(response.data.data.properties || []);
+      if (!response.error && response.data) {
+        setProperties(response.data || []);
       }
     } catch (error) {
       console.error('Error fetching properties:', error);
@@ -39,14 +39,14 @@ const Maintenance = () => {
 
   const fetchRequests = async () => {
     try {
-      const params: any = {};
+      const params: { status?: string; category?: string; property_id?: string } = {};
       if (filters.status) params.status = filters.status;
       if (filters.category) params.category = filters.category;
-      if (filters.propertyId) params.propertyId = filters.propertyId;
+      if (filters.propertyId) params.property_id = filters.propertyId;
 
       const response = await maintenanceApi.getAll(params);
-      if (response.data.success && response.data.data) {
-        setRequests(response.data.data.requests || []);
+      if (!response.error && response.data) {
+        setRequests(response.data || []);
       }
     } catch (error) {
       console.error('Error fetching maintenance requests:', error);
@@ -58,8 +58,8 @@ const Maintenance = () => {
   const fetchStats = async () => {
     try {
       const response = await maintenanceApi.getStats();
-      if (response.data.success && response.data.data) {
-        setStats(response.data.data);
+      if (!response.error && response.data) {
+        setStats(response.data);
       }
     } catch (error) {
       console.error('Error fetching stats:', error);

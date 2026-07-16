@@ -28,8 +28,8 @@ const Utilities = () => {
   const fetchProperties = async () => {
     try {
       const response = await propertyApi.getMyProperties();
-      if (response.data.success && response.data.data) {
-        const props = response.data.data.properties || [];
+      if (!response.error && response.data) {
+        const props = response.data || [];
         setProperties(props);
         if (props.length > 0) {
           setSelectedProperty(props[0].id);
@@ -45,19 +45,19 @@ const Utilities = () => {
   const fetchData = async () => {
     try {
       if (activeTab === 'readings') {
-        const response = await utilityApi.getReadings({ propertyId: selectedProperty, limit: 20 });
-        if (response.data.success && response.data.data) {
-          setReadings(response.data.data.readings || []);
+        const response = await utilityApi.getReadings({ property_id: selectedProperty, limit: 20 });
+        if (!response.error && response.data) {
+          setReadings(response.data || []);
         }
       } else if (activeTab === 'payments') {
-        const response = await utilityApi.getPayments({ propertyId: selectedProperty, limit: 20 });
-        if (response.data.success && response.data.data) {
-          setPayments(response.data.data.payments || []);
+        const response = await utilityApi.getPayments({ property_id: selectedProperty, limit: 20 });
+        if (!response.error && response.data) {
+          setPayments(response.data || []);
         }
       } else if (activeTab === 'billing') {
         const response = await utilityApi.getBilling(selectedProperty);
-        if (response.data.success && response.data.data) {
-          setBillingSummary(response.data.data);
+        if (!response.error && response.data) {
+          setBillingSummary(response.data);
         }
       }
     } catch (error) {

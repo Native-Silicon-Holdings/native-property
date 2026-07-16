@@ -4,6 +4,21 @@ import { financialApi } from '../../services/api';
 import { DollarSign, TrendingUp, TrendingDown, FileText } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 
+interface Transaction {
+  date: string;
+  type: 'INCOME' | 'EXPENSE';
+  category: string;
+  description: string;
+  amount: number;
+}
+
+interface BudgetLine {
+  category: string;
+  budgeted_amount: number;
+  spent_amount: number;
+  variance: number;
+}
+
 const FinancialDashboard = () => {
   const { user } = useAuth();
   const [overview, setOverview] = useState<any>(null);
@@ -22,11 +37,26 @@ const FinancialDashboard = () => {
 
   const fetchData = async () => {
     try {
-      const response = await financialApi.getOverview();
-      if (response.data.success && response.data.data) {
-        setOverview(response.data.data.overview);
-        setBudget(response.data.data.budget);
-        setTransactions(response.data.data.transactions || []);
+      const [txResponse, budgetResponse] = await Promise.all([
+        financialApi.getOverview(),
+        financialApi.getBudget(),
+      ]);
+
+      if (!txResponse.error && txResponse.data) {
+        const txns = txResponse.data as unknown as Transaction[];
+        setTransactions(txns);
+
+        const income = txns.filter((t) => t.type === 'INCOME').reduce((sum, t) => sum + t.amount, 0);
+        const expenses = txns.filter((t) => t.type === 'EXPENSE').reduce((sum, t) => sum + t.amount, 0);
+        const utilityIncome = txns
+          .filter((t) => t.type === 'INCOME' && t.category.toLowerCase().includes('utilit'))
+          .reduce((sum, t) => sum + t.amount, 0);
+
+        setOverview({ income, expenses, netIncome: income - expenses, utilityIncome });
+      }
+
+      if (!budgetResponse.error && budgetResponse.data) {
+        setBudget({ lines: budgetResponse.data as unknown as BudgetLine[] });
       }
     } catch (error) {
       console.error('Error fetching financial data:', error);
@@ -117,11 +147,11 @@ const FinancialDashboard = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {budget.lines?.map((line: any, index: number) => (
+                {budget.lines?.map((line: BudgetLine, index: number) => (
                   <tr key={index}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{line.category}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right">R {line.budgetedAmount?.toFixed(2)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right">R {line.spentAmount?.toFixed(2)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right">R {line.budgeted_amount?.toFixed(2)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right">R {line.spent_amount?.toFixed(2)}</td>
                     <td className={`px-6 py-4 whitespace-nowrap text-sm text-right ${
                       line.variance >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}>
