@@ -658,8 +658,9 @@ export const financialApi = {
     return query;
   },
 
-  createTransaction: async (data: { date: string; type: string; category: string; description: string; amount: number; reference?: string; attachment_url?: string }) => {
+  createTransaction: async (data: { organization_id: string; date: string; type: string; category: string; description: string; amount: number; reference?: string; attachment_url?: string }) => {
     return supabase.rpc('rpc_create_transaction', {
+      p_organization_id: data.organization_id,
       p_date: data.date,
       p_type: data.type,
       p_category: data.category,
@@ -682,8 +683,9 @@ export const financialApi = {
     return query;
   },
 
-  createBudget: async (data: { fiscal_year: number; category: string; budgeted_amount: number }) => {
+  createBudget: async (data: { organization_id: string; fiscal_year: number; category: string; budgeted_amount: number }) => {
     return supabase.rpc('rpc_create_budget_line', {
+      p_organization_id: data.organization_id,
       p_fiscal_year: data.fiscal_year,
       p_category: data.category,
       p_budgeted_amount: data.budgeted_amount,
@@ -750,8 +752,9 @@ export const directorApi = {
       .single();
   },
 
-  create: async (data: { user_id: string; position: string; elected_date: string; term_end_date: string; portfolio?: string; biography?: string; contact_email?: string }) => {
+  create: async (data: { organization_id: string; user_id: string; position: string; elected_date: string; term_end_date: string; portfolio?: string; biography?: string; contact_email?: string }) => {
     return supabase.rpc('rpc_create_director', {
+      p_organization_id: data.organization_id,
       p_user_id: data.user_id,
       p_position: data.position,
       p_elected_date: data.elected_date,
@@ -829,8 +832,9 @@ export const electionApi = {
       .order('vote_count', { ascending: false });
   },
 
-  create: async (data: { title: string; description?: string; type: string; nominations_start_date: string; nominations_end_date: string; voting_start_date: string; voting_end_date: string }) => {
+  create: async (data: { organization_id: string; title: string; description?: string; type: string; nominations_start_date: string; nominations_end_date: string; voting_start_date: string; voting_end_date: string }) => {
     return supabase.rpc('rpc_create_election', {
+      p_organization_id: data.organization_id,
       p_title: data.title,
       p_description: data.description,
       p_type: data.type,
