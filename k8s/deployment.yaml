@@ -1,5 +1,7 @@
 # =============================================================================
-# Deployment — native-property frontend (nginx static SPA)
+# Deployment — Native Estate frontend (nginx static SPA)
+# NOTE: resource/namespace names remain native-property to avoid a disruptive
+# infra rename; product-facing labels use the native-estate brand name.
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
@@ -8,7 +10,7 @@ metadata:
   namespace: native-property
   labels:
     app: native-property
-    app.kubernetes.io/name: native-property
+    app.kubernetes.io/name: native-estate
     app.kubernetes.io/part-of: native-silicon
 spec:
   replicas: 2

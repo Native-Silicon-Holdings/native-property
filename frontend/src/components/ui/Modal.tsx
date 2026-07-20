@@ -122,7 +122,7 @@ export const Modal: React.FC<ModalProps> = ({
       <div
         ref={modalRef}
         className={clsx(
-          'relative bg-white rounded-lg shadow-xl w-full',
+          'relative bg-card text-card-foreground rounded-lg shadow-xl w-full border border-border',
           sizeStyles[size],
           'max-h-[90vh] flex flex-col'
         )}
@@ -130,16 +130,16 @@ export const Modal: React.FC<ModalProps> = ({
       >
         {/* Header */}
         {(title || showCloseButton) && (
-          <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between p-6 border-b border-border">
             {title && (
-              <h2 id="modal-title" className="text-xl font-semibold text-gray-900">
+              <h2 id="modal-title" className="font-display text-xl text-foreground">
                 {title}
               </h2>
             )}
             {showCloseButton && (
               <button
                 onClick={onClose}
-                className="ml-auto p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                className="ml-auto p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/10 transition-colors"
                 aria-label="Close modal"
               >
                 <X className="h-5 w-5" />
@@ -153,7 +153,7 @@ export const Modal: React.FC<ModalProps> = ({
 
         {/* Footer */}
         {footer && (
-          <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
+          <div className="flex items-center justify-end gap-3 p-6 border-t border-border">
             {footer}
           </div>
         )}

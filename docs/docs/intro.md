@@ -3,40 +3,34 @@ sidebar_position: 1
 slug: /
 ---
 
-# Welcome to Estate Management Platform
+# Welcome to Native Estate
 
-Welcome to the **Estate Management Platform** documentation! This comprehensive guide will help you understand, use, and develop with our enterprise-grade residential estate management solution.
+Welcome to the **Native Estate** documentation! This guide covers the multi-estate residential management product in the Native Silicon suite.
 
-## What is Estate Management Platform?
+## What is Native Estate?
 
-Estate Management Platform is a modern, **enterprise-ready** solution designed to solve common challenges in residential estate governance, communication, and accountability. Built with cutting-edge technology and world-class security, it provides a robust platform for estate management suitable for organizations of any size.
+Native Estate helps **managing agents** run many estates from one desk, and helps **directors, homeowners, and tenants** work inside a single estate. Estates contain **units** (homes), plus governance, maintenance, utilities, and finance.
 
 **Available as:**
-- 🌐 **Web Application** - Access from any browser
-- 🖥️ **Desktop Application** - Native apps for Windows, macOS, and Linux
+- Web application at `estate.nativesilicon.co.za`
+- Part of the Native Silicon ecosystem (shared `core` identity)
 
-## 🌟 Why Choose Estate Management Platform?
+## Why Native Estate?
 
-### ✅ Enterprise-Grade Security
-- **9.5/10 Security Rating** - Industry-leading protection
-- **SOC 2, GDPR, ISO 27001 Ready** - Full compliance support
-- **Field-Level Encryption** - Military-grade AES-256-GCM
-- **Comprehensive Audit Trails** - 43+ tracked security events
-- **OWASP Top 10 Compliant** - Protection against all major vulnerabilities
+### Multi-estate portfolio
+- Portfolio hub with cross-estate alerts
+- Sticky estate switcher for agents
+- Single-estate orgs auto-open their estate
 
-### ✅ Multiple Authentication Methods
-- Traditional email/password with **enterprise password policies**
-- **Facial Recognition Authentication** - Cutting-edge biometric login
-- **TOTP Two-Factor Authentication** - Compatible with Google Authenticator, Authy
-- **Trusted Device Management** - Remember devices for 30 days
-- **Backup Codes** - Never lose access to your account
+### Estate operations
+- Units, maintenance, utilities, and levies
+- Elections, voting, directors, and meetings
+- Documents and announcements
 
-### ✅ Native Desktop Experience
-- **10-15MB Installers** - 87% smaller than competitors
-- **Native Performance** - Built with Rust for maximum speed
-- **System Integration** - Tray icons, native notifications, file system access
-- **Auto-Updates** - Seamless automatic updates
-- **Offline Capabilities** - Work without internet connection
+### Native Silicon security
+- Shared Authentik / Supabase identity via `core`
+- Org-scoped RLS with estate context in the URL
+- Entitlement gate: `app_key = native-estate`
 
 ### ✅ Compliance & Data Protection
 - **GDPR Compliant** - Right to access, erasure, data portability

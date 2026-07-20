@@ -1,5 +1,5 @@
 # =============================================================================
-# Ingress — native-property (subdomain TBD: property.nativesilicon.co.za)
+# Ingress — Native Estate (estate.nativesilicon.co.za)
 # =============================================================================
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -12,16 +12,16 @@ metadata:
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
   labels:
     app: native-property
-    app.kubernetes.io/name: native-property
+    app.kubernetes.io/name: native-estate
     app.kubernetes.io/part-of: native-silicon
 spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - property.nativesilicon.co.za
+        - estate.nativesilicon.co.za
       secretName: native-property-tls
   rules:
-    - host: property.nativesilicon.co.za
+    - host: estate.nativesilicon.co.za
       http:
         paths:
           - path: /

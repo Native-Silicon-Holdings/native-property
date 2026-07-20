@@ -1,5 +1,5 @@
 # =============================================================================
-# Service — native-property frontend
+# Service — Native Estate frontend
 # =============================================================================
 apiVersion: v1
 kind: Service
@@ -8,6 +8,7 @@ metadata:
   namespace: native-property
   labels:
     app: native-property
+    app.kubernetes.io/name: native-estate
 spec:
   selector:
     app: native-property

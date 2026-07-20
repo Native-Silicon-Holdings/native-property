@@ -1,11 +1,13 @@
 # =============================================================================
-# HPA — native-property frontend (auto-scale based on CPU)
+# HPA — Native Estate frontend (auto-scale based on CPU)
 # =============================================================================
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: native-property
   namespace: native-property
+  labels:
+    app.kubernetes.io/name: native-estate
 spec:
   scaleTargetRef:
     apiVersion: apps/v1

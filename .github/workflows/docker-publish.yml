@@ -16,7 +16,7 @@ permissions:
   packages: write
 
 env:
-  PROJECT_NAME: native-property
+  PROJECT_NAME: native-estate
   FRONTEND_CONTEXT: ./frontend
 
 jobs:

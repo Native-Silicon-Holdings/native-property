@@ -1,10 +1,11 @@
 # =============================================================================
-# native-property Namespace
+# native-property Namespace (hosts the Native Estate app; namespace name kept
+# stable to avoid a disruptive rename)
 # =============================================================================
 apiVersion: v1
 kind: Namespace
 metadata:
   name: native-property
   labels:
-    app.kubernetes.io/name: native-property
+    app.kubernetes.io/name: native-estate
     app.kubernetes.io/part-of: native-silicon

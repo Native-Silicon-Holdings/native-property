@@ -14,34 +14,35 @@ export default {
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
 
+        // Ink/stone scale -- replaces the previous purple primary
         primary: {
-          50: '#f5f3f7',
-          100: '#ebe7ef',
-          200: '#d7cfe0',
-          300: '#c3b7d0',
-          400: '#b8a9c9',
-          500: '#a67db8',
-          600: '#956ba6',
-          700: '#7f5a8f',
-          800: '#694a78',
-          900: '#533a61',
-          950: '#3d2b4a',
+          50: '#f6f4f1',
+          100: '#eae6df',
+          200: '#d3ccc0',
+          300: '#b0a596',
+          400: '#867a6b',
+          500: '#635a4d',
+          600: '#4a4235',
+          700: '#3a3328',
+          800: '#2a251d',
+          900: '#1e1a15',
+          950: '#1b2029',
           DEFAULT: 'hsl(var(--primary))',
           foreground: 'hsl(var(--primary-foreground))',
         },
 
         secondary: {
-          50: '#f7f9fc',
-          100: '#eff3f8',
-          200: '#dfe7f1',
-          300: '#bfcfe3',
-          400: '#9fb3d1',
-          500: '#7f97bf',
-          600: '#6b7fa0',
-          700: '#566680',
-          800: '#404d60',
-          900: '#2b3440',
-          950: '#151a20',
+          50: '#faf8f5',
+          100: '#f2eee7',
+          200: '#e4dccd',
+          300: '#d1c4ac',
+          400: '#b8a684',
+          500: '#9c8865',
+          600: '#7d6c4f',
+          700: '#5f513c',
+          800: '#41372a',
+          900: '#251f18',
+          950: '#14110d',
           DEFAULT: 'hsl(var(--secondary))',
           foreground: 'hsl(var(--secondary-foreground))',
         },
@@ -73,29 +74,29 @@ export default {
 
         // Semantic colors
         success: {
-          DEFAULT: 'hsl(142 69% 50%)',
-          foreground: 'hsl(150 15% 95%)',
+          DEFAULT: 'hsl(95 30% 32%)',
+          foreground: 'hsl(36 25% 97%)',
         },
         warning: {
-          DEFAULT: 'hsl(38 92% 50%)',
-          foreground: 'hsl(217 17% 18%)',
+          DEFAULT: 'hsl(35 65% 45%)',
+          foreground: 'hsl(220 20% 14%)',
         },
         error: {
-          DEFAULT: 'hsl(0 84% 60%)',
-          foreground: 'hsl(150 15% 95%)',
+          DEFAULT: 'hsl(6 55% 44%)',
+          foreground: 'hsl(36 25% 97%)',
         },
         info: {
-          DEFAULT: 'hsl(199 89% 48%)',
-          foreground: 'hsl(150 15% 95%)',
+          DEFAULT: 'hsl(205 35% 40%)',
+          foreground: 'hsl(36 25% 97%)',
         },
 
         // Financial colors
         financial: {
-          income: 'hsl(142 69% 50%)',
-          expense: 'hsl(0 84% 60%)',
-          asset: 'hsl(199 89% 48%)',
-          liability: 'hsl(38 92% 50%)',
-          equity: 'hsl(271 76% 53%)',
+          income: 'hsl(95 30% 32%)',
+          expense: 'hsl(6 55% 44%)',
+          asset: 'hsl(205 35% 40%)',
+          liability: 'hsl(35 65% 45%)',
+          equity: 'hsl(260 12% 40%)',
         },
       },
 
@@ -106,8 +107,14 @@ export default {
       },
 
       fontFamily: {
+        display: [
+          '"Instrument Serif"',
+          'ui-serif',
+          'Georgia',
+          'serif',
+        ],
         sans: [
-          'Inter',
+          '"Plus Jakarta Sans"',
           'ui-sans-serif',
           'system-ui',
           '-apple-system',
@@ -127,6 +134,10 @@ export default {
           'Courier New',
           'monospace',
         ],
+      },
+
+      transitionTimingFunction: {
+        estate: 'cubic-bezier(0.22, 1, 0.36, 1)',
       },
     },
   },
