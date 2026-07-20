@@ -1,23 +1,26 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { Building2, Filter, MapPin, Plus, Search, Users } from 'lucide-react';
-import { propertyApi } from '../../services/api';
+import { unitApi } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
+import { useEstate } from '../../contexts/EstateContext';
 import { Modal } from '../../components/ui/Modal';
 
-const PROPERTY_TYPES = [
-  { value: '', label: 'All property types' },
+const UNIT_TYPES = [
+  { value: '', label: 'All unit types' },
   { value: 'HOUSE', label: 'House' },
   { value: 'APARTMENT', label: 'Apartment' },
   { value: 'TOWNHOUSE', label: 'Townhouse' },
   { value: 'COMMERCIAL', label: 'Commercial' },
 ];
 
-const Properties = () => {
+const Units = () => {
   const { user } = useAuth();
-  const isAdmin = user && ['DIRECTOR', 'MANAGER'].includes(user.role);
+  const { estateSlug } = useParams<{ estateSlug: string }>();
+  const { activeEstate } = useEstate();
+  const canManage = user?.isOrgStaff || user?.estateRole === 'DIRECTOR';
 
-  const [properties, setProperties] = useState<any[]>([]);
+  const [units, setUnits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ search: '', type: '' });
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -25,85 +28,71 @@ const Properties = () => {
   const [formData, setFormData] = useState({
     unitNumber: '',
     address: '',
-    propertyType: 'APARTMENT',
+    unitType: 'APARTMENT',
     squareMeters: '',
     occupants: 1,
   });
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchProperties();
+    fetchUnits();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, isAdmin]);
+  }, [filters, canManage, activeEstate?.id]);
 
-  const fetchProperties = async () => {
+  const fetchUnits = async () => {
     setLoading(true);
     try {
       let response;
-      if (isAdmin) {
-        const params: any = {};
+      if (canManage) {
+        const params: any = { estateId: activeEstate?.id };
         if (filters.search) params.search = filters.search;
-        if (filters.type) params.type = filters.type;
-        response = await propertyApi.getAll(params);
+        if (filters.type) params.unit_type = filters.type;
+        response = await unitApi.getAll(params);
       } else {
-        response = await propertyApi.getMyProperties();
+        response = await unitApi.getMyUnits(activeEstate?.id);
       }
 
-      const data = response.data;
-      const list = data || [];
-      setProperties(list);
+      setUnits(response.data || []);
     } catch (err) {
-      console.error('Error fetching properties:', err);
+      console.error('Error fetching units:', err);
     } finally {
       setLoading(false);
     }
   };
 
   const stats = useMemo(() => {
-    const totalOccupants = properties.reduce((sum, prop) => sum + (prop.occupants || 0), 0);
-    const totalResidents = properties.reduce(
-      (sum, prop) => sum + (prop.property_ownerships?.length || 0),
-      0
-    );
-    const byType = PROPERTY_TYPES.filter((t) => t.value).map((type) => ({
+    const totalOccupants = units.reduce((sum, unit) => sum + (unit.occupants || 0), 0);
+    const byType = UNIT_TYPES.filter((t) => t.value).map((type) => ({
       ...type,
-      count: properties.filter((prop) => prop.property_type === type.value).length,
+      count: units.filter((unit) => unit.unit_type === type.value).length,
     }));
 
-    return {
-      total: properties.length,
-      totalOccupants,
-      totalResidents,
-      byType,
-    };
-  }, [properties]);
+    return { total: units.length, totalOccupants, byType };
+  }, [units]);
 
-  const handleCreateProperty = async (e: React.FormEvent) => {
+  const handleCreateUnit = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreating(true);
     setError(null);
 
     try {
-      await propertyApi.create({
+      if (!activeEstate) throw new Error('No active estate');
+
+      await unitApi.create({
         unit_number: formData.unitNumber.trim(),
         address: formData.address.trim(),
-        property_type: formData.propertyType,
+        unit_type: formData.unitType,
         square_meters: parseFloat(formData.squareMeters as any) || 0,
         occupants: Number(formData.occupants) || 1,
-        organization_id: user?.organizationId || '',
+        organization_id: activeEstate.organizationId,
+        estate_id: activeEstate.id,
       });
 
       setShowCreateModal(false);
-      setFormData({
-        unitNumber: '',
-        address: '',
-        propertyType: 'APARTMENT',
-        squareMeters: '',
-        occupants: 1,
-      });
-      fetchProperties();
+      setFormData({ unitNumber: '', address: '', unitType: 'APARTMENT', squareMeters: '', occupants: 1 });
+      fetchUnits();
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to create property');
+      setError(err?.message || 'Failed to create unit');
     } finally {
       setCreating(false);
     }
@@ -111,8 +100,8 @@ const Properties = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -121,18 +110,15 @@ const Properties = () => {
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Property Management</h1>
-          <p className="text-gray-600 mt-1">
-            Manage units, ownership, and occupancy based on the estate schema.
+          <h1 className="font-display text-3xl text-foreground">Units</h1>
+          <p className="text-muted-foreground mt-1">
+            Manage units, ownership, and occupancy for {activeEstate?.name || 'this estate'}.
           </p>
         </div>
-        {isAdmin && (
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="btn-primary flex items-center space-x-2"
-          >
+        {canManage && (
+          <button onClick={() => setShowCreateModal(true)} className="btn-primary flex items-center space-x-2">
             <Plus className="h-4 w-4" />
-            <span>New Property</span>
+            <span>New Unit</span>
           </button>
         )}
       </div>
@@ -141,28 +127,28 @@ const Properties = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="card flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600">Total Properties</p>
+            <p className="text-sm text-muted-foreground">Total Units</p>
             <p className="text-2xl font-bold mt-1">{stats.total}</p>
           </div>
-          <Building2 className="h-8 w-8 text-primary-600" />
+          <Building2 className="h-8 w-8 text-accent" />
         </div>
         <div className="card flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600">Recorded Occupants</p>
+            <p className="text-sm text-muted-foreground">Recorded Occupants</p>
             <p className="text-2xl font-bold mt-1">{stats.totalOccupants}</p>
           </div>
-          <Users className="h-8 w-8 text-secondary-600" />
+          <Users className="h-8 w-8 text-accent" />
         </div>
         <div className="card flex flex-col">
           <div className="flex items-center space-x-2 mb-3">
-            <Filter className="h-4 w-4 text-gray-500" />
-            <p className="text-sm text-gray-600">By Type</p>
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">By Type</p>
           </div>
           <div className="grid grid-cols-2 gap-2">
             {stats.byType.map((type) => (
-              <div key={type.value} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg">
-                <span className="text-sm text-gray-700">{type.label}</span>
-                <span className="text-sm font-semibold text-gray-900">{type.count}</span>
+              <div key={type.value} className="flex items-center justify-between bg-secondary px-3 py-2 rounded-lg">
+                <span className="text-sm text-foreground">{type.label}</span>
+                <span className="text-sm font-semibold text-foreground">{type.count}</span>
               </div>
             ))}
           </div>
@@ -172,31 +158,31 @@ const Properties = () => {
       {/* Filters */}
       <div className="card">
         <div className="flex items-center space-x-3 mb-4">
-          <Filter className="h-5 w-5 text-gray-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Filters</h2>
+          <Filter className="h-5 w-5 text-muted-foreground" />
+          <h2 className="text-lg font-semibold text-foreground">Filters</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="relative">
             <label className="label">Search</label>
             <div className="relative">
-              <Search className="h-4 w-4 text-gray-500 absolute left-3 top-3" />
+              <Search className="h-4 w-4 text-muted-foreground absolute left-3 top-3" />
               <input
                 type="text"
                 value={filters.search}
                 onChange={(e) => setFilters({ ...filters, search: e.target.value })}
                 placeholder="Unit number or address"
-                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="input pl-9"
               />
             </div>
           </div>
           <div>
-            <label className="label">Property Type</label>
+            <label className="label">Unit Type</label>
             <select
               value={filters.type}
               onChange={(e) => setFilters({ ...filters, type: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              className="input"
             >
-              {PROPERTY_TYPES.map((type) => (
+              {UNIT_TYPES.map((type) => (
                 <option key={type.value || 'all'} value={type.value}>
                   {type.label}
                 </option>
@@ -205,78 +191,74 @@ const Properties = () => {
           </div>
           <div className="flex items-end">
             <div>
-              <p className="text-sm text-gray-500">
-                Showing {properties.length} of {stats.total} records
+              <p className="text-sm text-muted-foreground">
+                Showing {units.length} of {stats.total} records
               </p>
-              {!isAdmin && (
-                <p className="text-xs text-gray-500">Limited to properties you can access</p>
-              )}
+              {!canManage && <p className="text-xs text-muted-foreground">Limited to units you can access</p>}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Property list */}
+      {/* Unit list */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {properties.map((property) => (
+        {units.map((unit) => (
           <Link
-            key={property.id}
-            to={`/properties/${property.id}`}
+            key={unit.id}
+            to={`/e/${estateSlug}/units/${unit.id}`}
             className="card hover:shadow-lg transition-shadow"
           >
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center space-x-3">
-                  <h3 className="text-xl font-semibold text-gray-900">{property.unit_number}</h3>
-                  <span className="badge badge-primary">{property.property_type}</span>
+                  <h3 className="text-xl font-semibold text-foreground">{unit.unit_number}</h3>
+                  <span className="badge badge-primary">{unit.unit_type}</span>
                 </div>
-                <div className="flex items-center space-x-2 text-gray-600 mt-2">
+                <div className="flex items-center space-x-2 text-muted-foreground mt-2">
                   <MapPin className="h-4 w-4" />
-                  <span>{property.address}</span>
+                  <span>{unit.address}</span>
                 </div>
               </div>
-              <Building2 className="h-6 w-6 text-primary-600" />
+              <Building2 className="h-6 w-6 text-accent" />
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
               <div>
-                <p className="text-xs text-gray-500">Size</p>
-                <p className="text-sm font-semibold">{property.square_meters || 0} m²</p>
+                <p className="text-xs text-muted-foreground">Size</p>
+                <p className="text-sm font-semibold">{unit.square_meters || 0} m²</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Occupants</p>
+                <p className="text-xs text-muted-foreground">Occupants</p>
                 <p className="text-sm font-semibold flex items-center space-x-1">
-                  <Users className="h-4 w-4 text-gray-500" />
-                  <span>{property.occupants || 0}</span>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <span>{unit.occupants || 0}</span>
                 </p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Owners</p>
-                <p className="text-sm font-semibold">{property.property_ownerships?.length || 0}</p>
+                <p className="text-xs text-muted-foreground">Owners</p>
+                <p className="text-sm font-semibold">{unit.unit_ownerships?.length || 0}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Unit</p>
-                <p className="text-sm font-semibold">{property.unit_number}</p>
+                <p className="text-xs text-muted-foreground">Unit</p>
+                <p className="text-sm font-semibold">{unit.unit_number}</p>
               </div>
             </div>
 
-            {property.property_ownerships?.length > 0 && (
+            {unit.unit_ownerships?.length > 0 && (
               <div className="mt-4">
-                <p className="text-xs text-gray-500 mb-2">Ownership</p>
+                <p className="text-xs text-muted-foreground mb-2">Ownership</p>
                 <div className="flex flex-wrap gap-2">
-                  {property.property_ownerships.slice(0, 4).map((ownership: any) => (
+                  {unit.unit_ownerships.slice(0, 4).map((ownership: any) => (
                     <span
                       key={ownership.user_id + ownership.ownership_type}
-                      className="px-3 py-1 rounded-full bg-gray-100 text-xs font-medium text-gray-800"
+                      className="px-3 py-1 rounded-full bg-secondary text-xs font-medium text-foreground"
                     >
                       {ownership.ownership_type}
                       {!ownership.is_active ? ' (inactive)' : ''}
                     </span>
                   ))}
-                  {property.property_ownerships.length > 4 && (
-                    <span className="text-xs text-gray-500">
-                      +{property.property_ownerships.length - 4} more
-                    </span>
+                  {unit.unit_ownerships.length > 4 && (
+                    <span className="text-xs text-muted-foreground">+{unit.unit_ownerships.length - 4} more</span>
                   )}
                 </div>
               </div>
@@ -285,23 +267,18 @@ const Properties = () => {
         ))}
       </div>
 
-      {properties.length === 0 && (
+      {units.length === 0 && (
         <div className="card text-center py-12">
-          <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">No properties found for the current filters.</p>
+          <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">No units found for the current filters.</p>
         </div>
       )}
 
-      {/* Create property modal */}
-      <Modal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        title="Add Property"
-        size="lg"
-      >
-        <form onSubmit={handleCreateProperty} className="space-y-4">
+      {/* Create unit modal */}
+      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Add Unit" size="lg">
+        <form onSubmit={handleCreateUnit} className="space-y-4">
           {error && (
-            <div className="p-3 rounded-md bg-red-50 text-red-700 text-sm border border-red-200">
+            <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm border border-destructive/25">
               {error}
             </div>
           )}
@@ -317,13 +294,13 @@ const Properties = () => {
               />
             </div>
             <div>
-              <label className="label">Property Type</label>
+              <label className="label">Unit Type</label>
               <select
-                value={formData.propertyType}
-                onChange={(e) => setFormData({ ...formData, propertyType: e.target.value })}
+                value={formData.unitType}
+                onChange={(e) => setFormData({ ...formData, unitType: e.target.value })}
                 className="input"
               >
-                {PROPERTY_TYPES.filter((t) => t.value).map((type) => (
+                {UNIT_TYPES.filter((t) => t.value).map((type) => (
                   <option key={type.value} value={type.value}>
                     {type.label}
                   </option>
@@ -364,22 +341,14 @@ const Properties = () => {
             </div>
           </div>
           <div className="flex justify-end space-x-3 pt-2">
-            <button
-              type="button"
-              onClick={() => setShowCreateModal(false)}
-              className="btn-outline px-4 py-2 rounded-lg"
-            >
+            <button type="button" onClick={() => setShowCreateModal(false)} className="btn-outline px-4 py-2 rounded-lg">
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={creating}
-              className="btn-primary px-4 py-2 rounded-lg flex items-center space-x-2"
-            >
+            <button type="submit" disabled={creating} className="btn-primary px-4 py-2 rounded-lg flex items-center space-x-2">
               {creating && (
-                <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                <span className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
               )}
-              <span>{creating ? 'Saving...' : 'Create Property'}</span>
+              <span>{creating ? 'Saving...' : 'Create Unit'}</span>
             </button>
           </div>
         </form>
@@ -388,4 +357,4 @@ const Properties = () => {
   );
 };
 
-export default Properties;
+export default Units;

@@ -1,28 +1,35 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useEstate } from '../../contexts/EstateContext';
 import { electionApi } from '../../services/api';
 import { Vote, Plus } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
+import clsx from 'clsx';
 
 const Elections = () => {
   const { user } = useAuth();
+  const { activeEstate } = useEstate();
+  const { estateSlug } = useParams<{ estateSlug: string }>();
   const [elections, setElections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
 
+  const canManage = user?.isOrgStaff || user?.estateRole === 'DIRECTOR';
+
   useEffect(() => {
     fetchElections();
-  }, [filter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, activeEstate?.id]);
 
   const fetchElections = async () => {
     try {
       let response;
       if (filter === 'active') {
-        response = await electionApi.getActive();
+        response = await electionApi.getActive(activeEstate?.id);
       } else if (filter !== 'all') {
-        response = await electionApi.getByStatus(filter);
+        response = await electionApi.getByStatus(filter, activeEstate?.id);
       } else {
-        response = await electionApi.getAll();
+        response = await electionApi.getAll(activeEstate?.id);
       }
 
       if (!response.error && response.data) {
@@ -37,29 +44,27 @@ const Elections = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
 
-  const canManage = user?.role === 'DIRECTOR' || user?.role === 'MANAGER';
-
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      UPCOMING: 'bg-gray-100 text-gray-800',
-      NOMINATIONS_OPEN: 'bg-blue-100 text-blue-800',
-      VOTING_OPEN: 'bg-green-100 text-green-800',
-      COMPLETED: 'bg-purple-100 text-purple-800',
-      CANCELLED: 'bg-red-100 text-red-800',
+      UPCOMING: 'bg-muted text-muted-foreground',
+      NOMINATIONS_OPEN: 'bg-info/15 text-info',
+      VOTING_OPEN: 'bg-success/15 text-success',
+      COMPLETED: 'bg-accent/15 text-accent',
+      CANCELLED: 'bg-destructive/15 text-destructive',
     };
-    return colors[status] || 'bg-gray-100 text-gray-800';
+    return colors[status] || 'bg-muted text-muted-foreground';
   };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Elections</h1>
+        <h1 className="font-display text-3xl text-foreground">Elections</h1>
         {canManage && (
           <button className="btn-primary flex items-center space-x-2">
             <Plus className="h-4 w-4" />
@@ -69,32 +74,17 @@ const Elections = () => {
       </div>
 
       {/* Filters */}
-      <div className="flex space-x-4 flex-wrap">
-        <button
-          onClick={() => setFilter('all')}
-          className={`px-4 py-2 rounded-lg ${
-            filter === 'all' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700'
-          }`}
-        >
-          All
-        </button>
-        <button
-          onClick={() => setFilter('active')}
-          className={`px-4 py-2 rounded-lg ${
-            filter === 'active' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700'
-          }`}
-        >
-          Active
-        </button>
-        {['UPCOMING', 'NOMINATIONS_OPEN', 'VOTING_OPEN', 'COMPLETED'].map((status) => (
+      <div className="flex space-x-4 flex-wrap gap-y-2">
+        {['all', 'active', 'UPCOMING', 'NOMINATIONS_OPEN', 'VOTING_OPEN', 'COMPLETED'].map((status) => (
           <button
             key={status}
             onClick={() => setFilter(status)}
-            className={`px-4 py-2 rounded-lg ${
-              filter === status ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700'
-            }`}
+            className={clsx(
+              'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+              filter === status ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'
+            )}
           >
-            {status.replace('_', ' ')}
+            {status === 'all' ? 'All' : status === 'active' ? 'Active' : status.replace('_', ' ')}
           </button>
         ))}
       </div>
@@ -104,21 +94,21 @@ const Elections = () => {
         {elections.map((election) => (
           <Link
             key={election.id}
-            to={`/elections/${election.id}`}
+            to={`/e/${estateSlug}/elections/${election.id}`}
             className="card hover:shadow-lg transition-shadow block"
           >
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <div className="flex items-center space-x-3 mb-2">
-                  <h3 className="text-lg font-semibold">{election.title}</h3>
+                  <h3 className="text-lg font-semibold text-foreground">{election.title}</h3>
                   <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(election.status)}`}>
                     {election.status.replace('_', ' ')}
                   </span>
                 </div>
                 {election.description && (
-                  <p className="text-sm text-gray-600 mb-3">{election.description}</p>
+                  <p className="text-sm text-muted-foreground mb-3">{election.description}</p>
                 )}
-                <div className="flex flex-wrap gap-4 text-xs text-gray-500">
+                <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
                   <span>Type: {election.type}</span>
                   <span>
                     Nominations: {new Date(election.nominations_start_date).toLocaleDateString()} -{' '}
@@ -130,12 +120,10 @@ const Elections = () => {
                   </span>
                 </div>
                 {election.candidates && (
-                  <p className="text-sm text-gray-600 mt-2">
-                    {election.candidates.length} candidate(s)
-                  </p>
+                  <p className="text-sm text-muted-foreground mt-2">{election.candidates.length} candidate(s)</p>
                 )}
               </div>
-              <Vote className="h-6 w-6 text-primary-600" />
+              <Vote className="h-6 w-6 text-accent" />
             </div>
           </Link>
         ))}
@@ -143,8 +131,8 @@ const Elections = () => {
 
       {elections.length === 0 && (
         <div className="card text-center py-12">
-          <Vote className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">No elections found</p>
+          <Vote className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-muted-foreground">No elections found</p>
         </div>
       )}
     </div>

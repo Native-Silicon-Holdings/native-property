@@ -1,9 +1,9 @@
 const AnnouncementDetail = () => {
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Announcement Detail</h1>
+      <h1 className="font-display text-2xl text-foreground mb-6">Announcement Detail</h1>
       <div className="card">
-        <p className="text-gray-600">Announcement details - Coming soon</p>
+        <p className="text-muted-foreground">Announcement details - Coming soon</p>
       </div>
     </div>
   );

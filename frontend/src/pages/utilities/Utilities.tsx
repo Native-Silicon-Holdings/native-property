@@ -1,42 +1,47 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { utilityApi, propertyApi } from '../../services/api';
+import { useEstate } from '../../contexts/EstateContext';
+import { utilityApi, unitApi } from '../../services/api';
 import { Plus } from 'lucide-react';
+import clsx from 'clsx';
 
 const Utilities = () => {
   const { user } = useAuth();
+  const { activeEstate } = useEstate();
   const [readings, setReadings] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
-  const [properties, setProperties] = useState<any[]>([]);
-  const [selectedProperty, setSelectedProperty] = useState<string>('');
+  const [units, setUnits] = useState<any[]>([]);
+  const [selectedUnit, setSelectedUnit] = useState<string>('');
   const [billingSummary, setBillingSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'readings' | 'payments' | 'billing'>('readings');
 
-  const canManage = user?.role === 'DIRECTOR' || user?.role === 'MANAGER' || user?.role === 'ACCOUNTANT';
+  const canManage = user?.isOrgStaff || user?.estateRole === 'DIRECTOR' || user?.estateRole === 'ACCOUNTANT';
 
   useEffect(() => {
-    fetchProperties();
-  }, []);
+    fetchUnits();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEstate?.id]);
 
   useEffect(() => {
-    if (selectedProperty) {
+    if (selectedUnit) {
       fetchData();
     }
-  }, [selectedProperty, activeTab]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedUnit, activeTab]);
 
-  const fetchProperties = async () => {
+  const fetchUnits = async () => {
     try {
-      const response = await propertyApi.getMyProperties();
+      const response = await unitApi.getMyUnits(activeEstate?.id);
       if (!response.error && response.data) {
-        const props = response.data || [];
-        setProperties(props);
-        if (props.length > 0) {
-          setSelectedProperty(props[0].id);
+        const list = response.data || [];
+        setUnits(list);
+        if (list.length > 0) {
+          setSelectedUnit(list[0].id);
         }
       }
     } catch (error) {
-      console.error('Error fetching properties:', error);
+      console.error('Error fetching units:', error);
     } finally {
       setLoading(false);
     }
@@ -45,17 +50,17 @@ const Utilities = () => {
   const fetchData = async () => {
     try {
       if (activeTab === 'readings') {
-        const response = await utilityApi.getReadings({ property_id: selectedProperty, limit: 20 });
+        const response = await utilityApi.getReadings({ unit_id: selectedUnit, limit: 20 });
         if (!response.error && response.data) {
           setReadings(response.data || []);
         }
       } else if (activeTab === 'payments') {
-        const response = await utilityApi.getPayments({ property_id: selectedProperty, limit: 20 });
+        const response = await utilityApi.getPayments({ unit_id: selectedUnit, limit: 20 });
         if (!response.error && response.data) {
           setPayments(response.data || []);
         }
       } else if (activeTab === 'billing') {
-        const response = await utilityApi.getBilling(selectedProperty);
+        const response = await utilityApi.getBilling(selectedUnit, activeEstate?.id);
         if (!response.error && response.data) {
           setBillingSummary(response.data);
         }
@@ -67,8 +72,8 @@ const Utilities = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -76,7 +81,7 @@ const Utilities = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Utility Management</h1>
+        <h1 className="font-display text-3xl text-foreground">Utility Management</h1>
         {canManage && (
           <button className="btn-primary flex items-center space-x-2">
             <Plus className="h-4 w-4" />
@@ -85,20 +90,14 @@ const Utilities = () => {
         )}
       </div>
 
-      {/* Property Selector */}
-      {properties.length > 0 && (
+      {/* Unit Selector */}
+      {units.length > 0 && (
         <div className="card">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Select Property
-          </label>
-          <select
-            value={selectedProperty}
-            onChange={(e) => setSelectedProperty(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-          >
-            {properties.map((prop) => (
-              <option key={prop.id} value={prop.id}>
-                {prop.unit_number} - {prop.address}
+          <label className="label">Select Unit</label>
+          <select value={selectedUnit} onChange={(e) => setSelectedUnit(e.target.value)} className="input">
+            {units.map((unit) => (
+              <option key={unit.id} value={unit.id}>
+                {unit.unit_number} - {unit.address}
               </option>
             ))}
           </select>
@@ -106,55 +105,37 @@ const Utilities = () => {
       )}
 
       {/* Tabs */}
-      <div className="flex space-x-4 border-b">
-        <button
-          onClick={() => setActiveTab('readings')}
-          className={`px-4 py-2 font-medium ${
-            activeTab === 'readings'
-              ? 'border-b-2 border-primary-600 text-primary-600'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          Readings
-        </button>
-        <button
-          onClick={() => setActiveTab('payments')}
-          className={`px-4 py-2 font-medium ${
-            activeTab === 'payments'
-              ? 'border-b-2 border-primary-600 text-primary-600'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          Payments
-        </button>
-        <button
-          onClick={() => setActiveTab('billing')}
-          className={`px-4 py-2 font-medium ${
-            activeTab === 'billing'
-              ? 'border-b-2 border-primary-600 text-primary-600'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          Billing Summary
-        </button>
+      <div className="flex space-x-4 border-b border-border">
+        {(['readings', 'payments', 'billing'] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={clsx(
+              'px-4 py-2 font-medium border-b-2 -mb-px transition-colors',
+              activeTab === tab ? 'border-accent text-accent' : 'border-transparent text-muted-foreground hover:text-foreground'
+            )}
+          >
+            {tab === 'readings' ? 'Readings' : tab === 'payments' ? 'Payments' : 'Billing Summary'}
+          </button>
+        ))}
       </div>
 
       {/* Readings Tab */}
       {activeTab === 'readings' && (
         <div className="card">
-          <h2 className="text-lg font-semibold mb-4">Utility Readings</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Utility Readings</h2>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-border">
+              <thead className="bg-secondary">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Reading</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Consumption</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Type</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Reading</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Consumption</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Amount</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="divide-y divide-border">
                 {readings.map((reading) => (
                   <tr key={reading.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -171,28 +152,26 @@ const Utilities = () => {
               </tbody>
             </table>
           </div>
-          {readings.length === 0 && (
-            <p className="text-center py-8 text-gray-600">No readings found</p>
-          )}
+          {readings.length === 0 && <p className="text-center py-8 text-muted-foreground">No readings found</p>}
         </div>
       )}
 
       {/* Payments Tab */}
       {activeTab === 'payments' && (
         <div className="card">
-          <h2 className="text-lg font-semibold mb-4">Payments</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Payments</h2>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-border">
+              <thead className="bg-secondary">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Method</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Date</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Amount</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Method</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Reference</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Status</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="divide-y divide-border">
                 {payments.map((payment) => (
                   <tr key={payment.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -204,11 +183,15 @@ const Utilities = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm">{payment.payment_method}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">{payment.reference}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs rounded-full ${
-                        payment.status === 'CLEARED' ? 'bg-green-100 text-green-800' :
-                        payment.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
+                      <span
+                        className={`px-2 py-1 text-xs rounded-full ${
+                          payment.status === 'CLEARED'
+                            ? 'bg-success/15 text-success'
+                            : payment.status === 'PENDING'
+                            ? 'bg-warning/15 text-warning'
+                            : 'bg-destructive/15 text-destructive'
+                        }`}
+                      >
                         {payment.status}
                       </span>
                     </td>
@@ -217,9 +200,7 @@ const Utilities = () => {
               </tbody>
             </table>
           </div>
-          {payments.length === 0 && (
-            <p className="text-center py-8 text-gray-600">No payments found</p>
-          )}
+          {payments.length === 0 && <p className="text-center py-8 text-muted-foreground">No payments found</p>}
         </div>
       )}
 
@@ -227,47 +208,16 @@ const Utilities = () => {
       {activeTab === 'billing' && billingSummary && (
         <div className="space-y-6">
           <div className="card">
-            <h2 className="text-lg font-semibold mb-4">Billing Cycle</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-4">Billing Cycle</h2>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-sm text-gray-600">Start Date</p>
-                <p className="font-medium">
-                  {new Date(billingSummary.billingCycle.start_date).toLocaleDateString()}
-                </p>
+                <p className="text-sm text-muted-foreground">Start Date</p>
+                <p className="font-medium">{new Date(billingSummary.start_date).toLocaleDateString()}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">End Date</p>
-                <p className="font-medium">
-                  {new Date(billingSummary.billingCycle.end_date).toLocaleDateString()}
-                </p>
+                <p className="text-sm text-muted-foreground">End Date</p>
+                <p className="font-medium">{new Date(billingSummary.end_date).toLocaleDateString()}</p>
               </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="card">
-              <p className="text-sm text-gray-600">Total Consumption</p>
-              <p className="text-2xl font-bold mt-1">{billingSummary.summary.totalConsumption}</p>
-            </div>
-            <div className="card">
-              <p className="text-sm text-gray-600">Total Amount</p>
-              <p className="text-2xl font-bold mt-1 text-blue-600">
-                R {billingSummary.summary.totalAmount?.toFixed(2)}
-              </p>
-            </div>
-            <div className="card">
-              <p className="text-sm text-gray-600">Total Paid</p>
-              <p className="text-2xl font-bold mt-1 text-green-600">
-                R {billingSummary.summary.totalPaid?.toFixed(2)}
-              </p>
-            </div>
-            <div className="card">
-              <p className="text-sm text-gray-600">Outstanding</p>
-              <p className={`text-2xl font-bold mt-1 ${
-                billingSummary.summary.outstanding > 0 ? 'text-red-600' : 'text-green-600'
-              }`}>
-                R {billingSummary.summary.outstanding?.toFixed(2)}
-              </p>
             </div>
           </div>
         </div>
@@ -277,3 +227,4 @@ const Utilities = () => {
 };
 
 export default Utilities;
+
