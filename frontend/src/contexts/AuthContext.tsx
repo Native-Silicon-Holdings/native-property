@@ -2,17 +2,45 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
+/** Organization-level role, sourced from core.organization_members. */
+export type OrgRole = 'OWNER' | 'ADMIN' | 'MANAGER' | 'MEMBER';
+
+/** Estate-level role, sourced from native_estate.estate_members. */
+export type EstateRole = 'DIRECTOR' | 'HOMEOWNER' | 'TENANT' | 'ACCOUNTANT';
+
+const ORG_STAFF_ROLES: OrgRole[] = ['OWNER', 'ADMIN', 'MANAGER'];
+
+export interface OrganizationMembership {
+  organizationId: string;
+  organizationName?: string;
+  role: OrgRole;
+}
+
 export interface User {
   id: string;
+  /** core.users.id (cuid) — use for FK joins into core / native_estate */
+  coreUserId: string;
   email: string;
   firstName: string;
   lastName: string;
   phoneNumber?: string;
-  role: 'DIRECTOR' | 'MANAGER' | 'HOMEOWNER' | 'TENANT' | 'ACCOUNTANT';
+  /** All organizations this user belongs to. */
+  organizations: OrganizationMembership[];
+  /** The currently active organization (from JWT app_metadata, else the first membership). */
+  organizationId?: string;
+  organizationName?: string;
+  /** Role within the active organization. */
+  orgRole?: OrgRole;
+  /** Whether the active org role grants portfolio/staff chrome (OWNER/ADMIN/MANAGER). */
+  isOrgStaff: boolean;
+  /** Best-effort estate role for the user (refined per-estate by EstateContext). */
+  estateRole?: EstateRole;
+  /**
+   * @deprecated Legacy combined role used by older pages. Prefer `orgRole` / `estateRole`.
+   */
+  role: EstateRole | OrgRole;
   isActive: boolean;
   emailVerified: boolean;
-  organizationId?: string;
-  property?: any;
   createdAt: string;
   lastLogin?: string;
 }
@@ -22,10 +50,17 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  /** Authentik → GoTrue SAML SSO (domain must be registered with Supabase SSO). */
+  loginWithSSO: (domain?: string) => Promise<void>;
   loginWithOAuth: (provider: 'google' | 'github') => Promise<void>;
   register: (data: { email: string; password: string; firstName: string; lastName: string }) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (user: User) => void;
+}
+
+/** TEXT cuid-like id for core.users when the DB has no default. */
+function newCoreUserId(): string {
+  return `c${crypto.randomUUID().replace(/-/g, '')}`;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -42,24 +77,58 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+function splitName(name?: string | null): { firstName: string; lastName: string } {
+  if (!name?.trim()) return { firstName: '', lastName: '' };
+  const parts = name.trim().split(/\s+/);
+  return {
+    firstName: parts[0] || '',
+    lastName: parts.slice(1).join(' ') || '',
+  };
+}
+
 /**
- * Maps a Supabase Auth user + core.users row to the app's User type.
+ * Maps a Supabase Auth user + core profile + org memberships into the app's User type.
  */
 function mapSupabaseUser(
   supabaseUser: SupabaseUser,
-  coreProfile?: { first_name: string; last_name: string; phone_number?: string } | null,
-  orgMember?: { role: string; organization_id: string } | null
+  coreProfile: { id: string; name?: string | null; email?: string | null } | null,
+  memberships: OrganizationMembership[] = [],
+  estateRole?: EstateRole
 ): User {
+  const jwtOrgId = (supabaseUser.app_metadata as Record<string, unknown> | undefined)?.organizationId as
+    | string
+    | undefined;
+
+  const activeMembership =
+    memberships.find((m) => m.organizationId === jwtOrgId) || memberships[0];
+
+  const orgRole = activeMembership?.role;
+  const isOrgStaff = !!orgRole && ORG_STAFF_ROLES.includes(orgRole);
+  const fromCore = splitName(coreProfile?.name);
+  const firstName =
+    fromCore.firstName ||
+    supabaseUser.user_metadata?.first_name ||
+    '';
+  const lastName =
+    fromCore.lastName ||
+    supabaseUser.user_metadata?.last_name ||
+    '';
+
   return {
     id: supabaseUser.id,
-    email: supabaseUser.email || '',
-    firstName: coreProfile?.first_name || supabaseUser.user_metadata?.first_name || '',
-    lastName: coreProfile?.last_name || supabaseUser.user_metadata?.last_name || '',
-    phoneNumber: coreProfile?.phone_number || supabaseUser.user_metadata?.phone_number,
-    role: (orgMember?.role as User['role']) || 'HOMEOWNER',
+    coreUserId: coreProfile?.id || supabaseUser.id,
+    email: coreProfile?.email || supabaseUser.email || '',
+    firstName,
+    lastName,
+    organizations: memberships,
+    organizationId: activeMembership?.organizationId,
+    organizationName: activeMembership?.organizationName,
+    orgRole,
+    isOrgStaff,
+    estateRole,
+    role: estateRole || orgRole || 'HOMEOWNER',
     isActive: true,
     emailVerified: supabaseUser.email_confirmed_at != null,
-    organizationId: orgMember?.organization_id,
     createdAt: supabaseUser.created_at,
   };
 }
@@ -70,7 +139,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       setSession(currentSession);
       if (currentSession?.user) {
@@ -80,7 +148,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     });
 
-    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, newSession) => {
         setSession(newSession);
@@ -98,27 +165,61 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const loadUserProfile = async (supabaseUser: SupabaseUser) => {
     try {
-      // Fetch core.users profile
+      // core.users.id is a cuid; auth.uid() maps via supabase_id
       const { data: profile } = await supabase
         .schema('core')
         .from('users')
-        .select('first_name, last_name, phone_number')
-        .eq('id', supabaseUser.id)
-        .single();
+        .select('id, name, email')
+        .eq('supabase_id', supabaseUser.id)
+        .maybeSingle();
 
-      // Fetch organization membership
-      const { data: orgMember } = await supabase
+      if (!profile?.id) {
+        console.warn('No core.users row for supabase_id', supabaseUser.id);
+        setUser(mapSupabaseUser(supabaseUser, null, []));
+        return;
+      }
+
+      const { data: orgMembers } = await supabase
         .schema('core')
         .from('organization_members')
         .select('role, organization_id')
-        .eq('user_id', supabaseUser.id)
-        .limit(1)
-        .single();
+        .eq('user_id', profile.id);
 
-      setUser(mapSupabaseUser(supabaseUser, profile, orgMember));
+      const orgIds = (orgMembers || []).map((m) => m.organization_id);
+      let orgNames = new Map<string, string>();
+      if (orgIds.length > 0) {
+        const { data: orgs } = await supabase
+          .schema('core')
+          .from('organizations')
+          .select('id, name')
+          .in('id', orgIds);
+        orgNames = new Map((orgs || []).map((o) => [o.id, o.name]));
+      }
+
+      const memberships: OrganizationMembership[] = (orgMembers || []).map((m) => ({
+        organizationId: m.organization_id,
+        organizationName: orgNames.get(m.organization_id),
+        role: m.role as OrgRole,
+      }));
+
+      let estateRole: EstateRole | undefined;
+      try {
+        const { data: estateMember } = await supabase
+          .schema('native_estate')
+          .from('estate_members')
+          .select('role')
+          .eq('user_id', profile.id)
+          .limit(1)
+          .maybeSingle();
+        estateRole = estateMember?.role as EstateRole | undefined;
+      } catch {
+        // No estate membership — fine for org staff.
+      }
+
+      setUser(mapSupabaseUser(supabaseUser, profile, memberships, estateRole));
     } catch (error) {
       console.error('Error loading user profile:', error);
-      setUser(mapSupabaseUser(supabaseUser));
+      setUser(mapSupabaseUser(supabaseUser, null));
     } finally {
       setLoading(false);
     }
@@ -130,11 +231,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (data.user) await loadUserProfile(data.user);
   };
 
+  const loginWithSSO = async (domain?: string) => {
+    const ssoDomain =
+      domain ||
+      import.meta.env.VITE_SSO_DOMAIN ||
+      'nativesilicon.co.za';
+
+    const { error } = await supabase.auth.signInWithSSO({
+      domain: ssoDomain,
+      options: {
+        redirectTo: `${window.location.origin}/`,
+      },
+    });
+    if (error) throw error;
+  };
+
   const loginWithOAuth = async (provider: 'google' | 'github') => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/dashboard`,
+        redirectTo: `${window.location.origin}/`,
       },
     });
     if (error) throw error;
@@ -153,13 +269,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     });
     if (error) throw error;
     if (authData.user) {
-      // Create core.users row
-      await supabase.schema('core').from('users').upsert({
-        id: authData.user.id,
-        email: data.email,
-        first_name: data.firstName,
-        last_name: data.lastName,
-      });
+      const fullName = `${data.firstName} ${data.lastName}`.trim();
+      // Bridge by supabase_id — never use the Auth UUID as core.users.id (cuid).
+      const { data: existing } = await supabase
+        .schema('core')
+        .from('users')
+        .select('id')
+        .eq('supabase_id', authData.user.id)
+        .maybeSingle();
+
+      if (!existing) {
+        const { error: insertError } = await supabase.schema('core').from('users').insert({
+          id: newCoreUserId(),
+          email: data.email,
+          name: fullName || data.email,
+          supabase_id: authData.user.id,
+          password_hash: '',
+          role: 'USER',
+        });
+        if (insertError) {
+          console.error('Failed to create core.users bridge row:', insertError);
+          throw insertError;
+        }
+      }
       await loadUserProfile(authData.user);
     }
   };
@@ -179,6 +311,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     session,
     loading,
     login,
+    loginWithSSO,
     loginWithOAuth,
     register,
     logout,

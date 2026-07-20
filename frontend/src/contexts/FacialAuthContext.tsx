@@ -46,7 +46,7 @@ interface FacialAuthProviderProps {
  * 2. User initiates facial verification (e.g., before accessing sensitive actions)
  * 3. User uploads a compliance video
  * 4. System processes and verifies the facial data
- * 5. On success, the user's facial_verified flag is set in native_property.facial_verifications
+ * 5. On success, the user's facial_verified flag is set in native_estate.facial_verifications
  *
  * The facial verification can be required for:
  * - Physical gate/kiosk access
@@ -169,7 +169,7 @@ export const FacialAuthProvider: React.FC<FacialAuthProviderProps> = ({ children
    */
   const checkStatus = async (verificationId: string): Promise<FacialVerificationStatus> => {
     const { data, error } = await supabase
-      .schema('native_property')
+      .schema('native_estate')
       .from('facial_verifications')
       .select('status, verification_score, failure_reason, verified_at')
       .eq('id', verificationId)

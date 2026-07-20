@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { Building2 } from 'lucide-react';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -44,32 +43,33 @@ const Register = () => {
     try {
       const { confirmPassword, ...registerData } = formData;
       await register(registerData);
-      navigate('/dashboard');
+      navigate('/');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to register. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to register. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-secondary-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-background py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
-        <div>
-          <div className="flex justify-center">
-            <Building2 className="h-16 w-16 text-primary-600" />
+        <div className="text-center">
+          <div className="flex justify-center items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-accent" aria-hidden="true" />
+            <span className="font-display text-3xl text-foreground">Native Estate</span>
           </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          <h2 className="mt-6 text-center text-2xl font-display text-foreground">
             Create your account
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Join the Estate Management Platform
+          <p className="mt-2 text-center text-sm text-muted-foreground">
+            Join your estate's community
           </p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-xl p-8">
+        <div className="bg-card border border-border rounded-lg shadow-xl p-8">
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+            <div className="mb-4 p-3 bg-destructive/10 border border-destructive/25 text-destructive rounded-lg text-sm">
               {error}
             </div>
           )}
@@ -156,7 +156,7 @@ const Register = () => {
                 value={formData.password}
                 onChange={handleChange}
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Must be at least 8 characters with uppercase, lowercase, number, and special character
               </p>
             </div>
@@ -178,11 +178,7 @@ const Register = () => {
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full btn btn-primary"
-            >
+            <button type="submit" disabled={loading} className="w-full btn btn-primary">
               {loading ? 'Creating account...' : 'Create account'}
             </button>
           </form>
@@ -190,26 +186,23 @@ const Register = () => {
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
+                <div className="w-full border-t border-border" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Already have an account?</span>
+                <span className="px-2 bg-card text-muted-foreground">Already have an account?</span>
               </div>
             </div>
 
             <div className="mt-6">
-              <Link
-                to="/login"
-                className="w-full flex justify-center btn btn-outline"
-              >
+              <Link to="/login" className="w-full flex justify-center btn btn-outline">
                 Sign in instead
               </Link>
             </div>
           </div>
         </div>
 
-        <p className="text-center text-xs text-gray-500">
-          &copy; 2024 Estate Management Platform. All rights reserved.
+        <p className="text-center text-xs text-muted-foreground">
+          &copy; 2026 Native Estate. All rights reserved.
         </p>
       </div>
     </div>

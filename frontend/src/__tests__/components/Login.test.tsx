@@ -31,6 +31,7 @@ vi.mock('../../contexts/AuthContext', async () => {
     ...actual,
     useAuth: () => ({
       login: vi.fn(),
+      loginWithSSO: vi.fn(),
       user: null,
       loading: false,
     }),
@@ -55,11 +56,12 @@ describe('Login Component', () => {
   it('should render login form', () => {
     renderLogin();
 
-    expect(screen.getByText('Estate Management Platform')).toBeInTheDocument();
+    expect(screen.getByText('Native Estate')).toBeInTheDocument();
     expect(screen.getByText('Sign in to your account')).toBeInTheDocument();
     expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /sign in with native silicon sso/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /sign in with password/i })).toBeInTheDocument();
   });
 
   it('should validate email input', () => {

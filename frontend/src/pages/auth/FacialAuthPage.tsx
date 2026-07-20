@@ -18,7 +18,7 @@ const FacialAuthPage: React.FC = () => {
   const [verificationId, setVerificationId] = useState<string | null>(null);
   const [error, setError] = useState('');
 
-  const returnTo = (location.state as { returnTo?: string })?.returnTo || '/dashboard';
+  const returnTo = (location.state as { returnTo?: string })?.returnTo || '/';
 
   useEffect(() => {
     if (!user) return;
@@ -38,12 +38,12 @@ const FacialAuthPage: React.FC = () => {
 
   if (loading || !verificationId) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Initializing facial verification...</p>
+          <Loader2 className="w-12 h-12 animate-spin text-accent mx-auto mb-4" />
+          <p className="text-muted-foreground">Initializing facial verification...</p>
           {(error || contextError) && (
-            <p className="text-red-700 text-sm mt-4">{error || contextError}</p>
+            <p className="text-destructive text-sm mt-4">{error || contextError}</p>
           )}
         </div>
       </div>
@@ -51,7 +51,7 @@ const FacialAuthPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <ComplianceVerification
         verificationId={verificationId}
         onVerificationComplete={handleVerificationComplete}
