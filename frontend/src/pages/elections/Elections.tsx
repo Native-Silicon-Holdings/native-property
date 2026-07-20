@@ -25,8 +25,8 @@ const Elections = () => {
         response = await electionApi.getAll();
       }
 
-      if (response.data.success && response.data.data) {
-        setElections(response.data.data.elections || []);
+      if (!response.error && response.data) {
+        setElections(response.data);
       }
     } catch (error) {
       console.error('Error fetching elections:', error);
@@ -121,12 +121,12 @@ const Elections = () => {
                 <div className="flex flex-wrap gap-4 text-xs text-gray-500">
                   <span>Type: {election.type}</span>
                   <span>
-                    Nominations: {new Date(election.nominationsStartDate).toLocaleDateString()} -{' '}
-                    {new Date(election.nominationsEndDate).toLocaleDateString()}
+                    Nominations: {new Date(election.nominations_start_date).toLocaleDateString()} -{' '}
+                    {new Date(election.nominations_end_date).toLocaleDateString()}
                   </span>
                   <span>
-                    Voting: {new Date(election.votingStartDate).toLocaleDateString()} -{' '}
-                    {new Date(election.votingEndDate).toLocaleDateString()}
+                    Voting: {new Date(election.voting_start_date).toLocaleDateString()} -{' '}
+                    {new Date(election.voting_end_date).toLocaleDateString()}
                   </span>
                 </div>
                 {election.candidates && (
@@ -152,8 +152,3 @@ const Elections = () => {
 };
 
 export default Elections;
-
-
-
-
-

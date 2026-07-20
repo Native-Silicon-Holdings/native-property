@@ -30,14 +30,14 @@ const Dashboard = () => {
     try {
       const [announcementsRes, meetingsRes, maintenanceRes] = await Promise.all([
         announcementApi.getAll({ limit: 5 }),
-        meetingApi.getAll({ upcoming: 'true', limit: 5 }),
+        meetingApi.getAll({ status: 'SCHEDULED', limit: 5 }),
         maintenanceApi.getAll({ limit: 5 }),
       ]);
 
       setStats({
-        announcements: announcementsRes.data.data?.pagination?.total || 0,
-        upcomingMeetings: meetingsRes.data.data?.pagination?.total || 0,
-        maintenanceRequests: maintenanceRes.data.data?.pagination?.total || 0,
+        announcements: announcementsRes.data?.length || 0,
+        upcomingMeetings: meetingsRes.data?.length || 0,
+        maintenanceRequests: maintenanceRes.data?.length || 0,
         outstandingBalance: 0, // Calculate from payments
       });
     } catch (error) {
@@ -75,7 +75,8 @@ const Dashboard = () => {
           <div className="mt-4 flex items-center space-x-2 text-sm text-gray-600">
             <Building className="h-4 w-4" />
             <span>
-              Property: {user.property.unitNumber} - {user.property.address}
+              Property: {user.property.unit_number || user.property.unitNumber} -{' '}
+              {user.property.address}
             </span>
           </div>
         )}

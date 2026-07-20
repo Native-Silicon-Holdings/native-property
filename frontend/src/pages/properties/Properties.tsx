@@ -49,8 +49,8 @@ const Properties = () => {
         response = await propertyApi.getMyProperties();
       }
 
-      const data = response.data.data;
-      const list = data?.properties || [];
+      const data = response.data;
+      const list = data || [];
       setProperties(list);
     } catch (err) {
       console.error('Error fetching properties:', err);
@@ -61,10 +61,13 @@ const Properties = () => {
 
   const stats = useMemo(() => {
     const totalOccupants = properties.reduce((sum, prop) => sum + (prop.occupants || 0), 0);
-    const totalResidents = properties.reduce((sum, prop) => sum + (prop.users?.length || 0), 0);
+    const totalResidents = properties.reduce(
+      (sum, prop) => sum + (prop.property_ownerships?.length || 0),
+      0
+    );
     const byType = PROPERTY_TYPES.filter((t) => t.value).map((type) => ({
       ...type,
-      count: properties.filter((prop) => prop.propertyType === type.value).length,
+      count: properties.filter((prop) => prop.property_type === type.value).length,
     }));
 
     return {
@@ -82,11 +85,12 @@ const Properties = () => {
 
     try {
       await propertyApi.create({
-        unitNumber: formData.unitNumber.trim(),
+        unit_number: formData.unitNumber.trim(),
         address: formData.address.trim(),
-        propertyType: formData.propertyType,
-        squareMeters: parseFloat(formData.squareMeters as any) || 0,
+        property_type: formData.propertyType,
+        square_meters: parseFloat(formData.squareMeters as any) || 0,
         occupants: Number(formData.occupants) || 1,
+        organization_id: user?.organizationId || '',
       });
 
       setShowCreateModal(false);
@@ -223,8 +227,8 @@ const Properties = () => {
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center space-x-3">
-                  <h3 className="text-xl font-semibold text-gray-900">{property.unitNumber}</h3>
-                  <span className="badge badge-primary">{property.propertyType}</span>
+                  <h3 className="text-xl font-semibold text-gray-900">{property.unit_number}</h3>
+                  <span className="badge badge-primary">{property.property_type}</span>
                 </div>
                 <div className="flex items-center space-x-2 text-gray-600 mt-2">
                   <MapPin className="h-4 w-4" />
@@ -237,7 +241,7 @@ const Properties = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
               <div>
                 <p className="text-xs text-gray-500">Size</p>
-                <p className="text-sm font-semibold">{property.squareMeters || 0} m²</p>
+                <p className="text-sm font-semibold">{property.square_meters || 0} m²</p>
               </div>
               <div>
                 <p className="text-xs text-gray-500">Occupants</p>
@@ -247,30 +251,31 @@ const Properties = () => {
                 </p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Residents</p>
-                <p className="text-sm font-semibold">{property.users?.length || 0}</p>
+                <p className="text-xs text-gray-500">Owners</p>
+                <p className="text-sm font-semibold">{property.property_ownerships?.length || 0}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-500">Unit</p>
-                <p className="text-sm font-semibold">{property.unitNumber}</p>
+                <p className="text-sm font-semibold">{property.unit_number}</p>
               </div>
             </div>
 
-            {property.users?.length > 0 && (
+            {property.property_ownerships?.length > 0 && (
               <div className="mt-4">
-                <p className="text-xs text-gray-500 mb-2">Linked Users</p>
+                <p className="text-xs text-gray-500 mb-2">Ownership</p>
                 <div className="flex flex-wrap gap-2">
-                  {property.users.slice(0, 4).map((user: any) => (
+                  {property.property_ownerships.slice(0, 4).map((ownership: any) => (
                     <span
-                      key={user.id}
+                      key={ownership.user_id + ownership.ownership_type}
                       className="px-3 py-1 rounded-full bg-gray-100 text-xs font-medium text-gray-800"
                     >
-                      {user.firstName} {user.lastName} • {user.role}
+                      {ownership.ownership_type}
+                      {!ownership.is_active ? ' (inactive)' : ''}
                     </span>
                   ))}
-                  {property.users.length > 4 && (
+                  {property.property_ownerships.length > 4 && (
                     <span className="text-xs text-gray-500">
-                      +{property.users.length - 4} more
+                      +{property.property_ownerships.length - 4} more
                     </span>
                   )}
                 </div>

@@ -98,7 +98,7 @@ const Utilities = () => {
           >
             {properties.map((prop) => (
               <option key={prop.id} value={prop.id}>
-                {prop.unitNumber} - {prop.address}
+                {prop.unit_number} - {prop.address}
               </option>
             ))}
           </select>
@@ -158,10 +158,10 @@ const Utilities = () => {
                 {readings.map((reading) => (
                   <tr key={reading.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {new Date(reading.readingDate).toLocaleDateString()}
+                      {new Date(reading.reading_date).toLocaleDateString()}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">{reading.utilityType}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right">{reading.meterReading}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">{reading.utility_type}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-right">{reading.meter_reading}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-right">{reading.consumption}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
                       R {reading.amount?.toFixed(2)}
@@ -196,12 +196,12 @@ const Utilities = () => {
                 {payments.map((payment) => (
                   <tr key={payment.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {new Date(payment.paymentDate).toLocaleDateString()}
+                      {new Date(payment.payment_date).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
                       R {payment.amount?.toFixed(2)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">{payment.paymentMethod}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">{payment.payment_method}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">{payment.reference}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 text-xs rounded-full ${
@@ -232,13 +232,13 @@ const Utilities = () => {
               <div>
                 <p className="text-sm text-gray-600">Start Date</p>
                 <p className="font-medium">
-                  {new Date(billingSummary.billingCycle.startDate).toLocaleDateString()}
+                  {new Date(billingSummary.billingCycle.start_date).toLocaleDateString()}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">End Date</p>
                 <p className="font-medium">
-                  {new Date(billingSummary.billingCycle.endDate).toLocaleDateString()}
+                  {new Date(billingSummary.billingCycle.end_date).toLocaleDateString()}
                 </p>
               </div>
             </div>

@@ -41,6 +41,7 @@ Thumbs.db
 # Uploads
 uploads/
 
+.codegraph/
 # Database
 *.db
 *.sqlite

@@ -177,7 +177,7 @@ const Maintenance = () => {
                 <option value="">All Properties</option>
                 {properties.map((prop) => (
                   <option key={prop.id} value={prop.id}>
-                    {prop.unitNumber}
+                    {prop.unit_number}
                   </option>
                 ))}
               </select>
@@ -207,10 +207,10 @@ const Maintenance = () => {
                 </div>
                 <p className="text-sm text-gray-600 mb-2 line-clamp-2">{request.description}</p>
                 <div className="flex items-center space-x-4 text-xs text-gray-500">
-                  <span>Property: {request.property?.unitNumber}</span>
-                  <span>Submitted: {new Date(request.submittedAt).toLocaleDateString()}</span>
-                  {request.estimatedCost && (
-                    <span>Est. Cost: R {request.estimatedCost.toFixed(2)}</span>
+                  <span>Property: {request.property?.unit_number}</span>
+                  <span>Submitted: {new Date(request.submitted_at).toLocaleDateString()}</span>
+                  {request.estimated_cost && (
+                    <span>Est. Cost: R {request.estimated_cost.toFixed(2)}</span>
                   )}
                 </div>
               </div>

@@ -24,8 +24,8 @@ const Directors = () => {
         response = await directorApi.getAll();
       }
 
-      if (response.data.success && response.data.data) {
-        setDirectors(response.data.data.directors || []);
+      if (!response.error && response.data) {
+        setDirectors(response.data);
       }
     } catch (error) {
       console.error('Error fetching directors:', error);
@@ -91,17 +91,19 @@ const Directors = () => {
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <h3 className="text-lg font-semibold">
-                  {director.user?.firstName} {director.user?.lastName}
+                  {director.user
+                    ? `${director.user.first_name} ${director.user.last_name}`
+                    : director.contact_email || 'Director'}
                 </h3>
                 <p className="text-sm text-gray-600 mt-1">{director.position}</p>
                 {director.portfolio && (
                   <p className="text-sm text-gray-500 mt-1">{director.portfolio}</p>
                 )}
                 <div className="mt-3 text-xs text-gray-500">
-                  <p>Elected: {new Date(director.electedDate).toLocaleDateString()}</p>
-                  <p>Term Ends: {new Date(director.termEndDate).toLocaleDateString()}</p>
+                  <p>Elected: {new Date(director.elected_date).toLocaleDateString()}</p>
+                  <p>Term Ends: {new Date(director.term_end_date).toLocaleDateString()}</p>
                 </div>
-                {!director.isActive && (
+                {!director.is_active && (
                   <span className="inline-block mt-2 px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded">
                     Inactive
                   </span>
@@ -127,6 +129,3 @@ const Directors = () => {
 };
 
 export default Directors;
-
-
-

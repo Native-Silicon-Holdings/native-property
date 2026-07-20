@@ -73,8 +73,8 @@ const Voting = () => {
       <div>
         <h1 className="text-2xl font-bold">{election.title}</h1>
         <p className="text-gray-600 mt-1">
-          Voting Period: {new Date(election.votingStartDate).toLocaleDateString()} -{' '}
-          {new Date(election.votingEndDate).toLocaleDateString()}
+          Voting Period: {new Date(election.voting_start_date).toLocaleDateString()} -{' '}
+          {new Date(election.voting_end_date).toLocaleDateString()}
         </p>
       </div>
 
@@ -151,15 +151,15 @@ const Voting = () => {
           <h2 className="text-lg font-semibold mb-4">Results</h2>
           <div className="space-y-3">
             {candidates
-              .sort((a: any, b: any) => b.voteCount - a.voteCount)
+              .sort((a: any, b: any) => b.vote_count - a.vote_count)
               .map((candidate: any) => {
-                const percentage = totalVotes > 0 ? (candidate.voteCount / totalVotes) * 100 : 0;
+                const percentage = totalVotes > 0 ? (candidate.vote_count / totalVotes) * 100 : 0;
                 return (
                   <div key={candidate.id} className="border rounded-lg p-4">
                     <div className="flex justify-between items-center mb-2">
                       <span className="font-medium">{candidate.position}</span>
                       <span className="text-sm text-gray-600">
-                        {candidate.voteCount} votes ({percentage.toFixed(1)}%)
+                        {candidate.vote_count} votes ({percentage.toFixed(1)}%)
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">

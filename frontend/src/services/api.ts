@@ -258,12 +258,14 @@ export const utilityApi = {
     });
   },
 
-  getBilling: async (propertyId: string) => {
+  getBilling: async (_propertyId: string) => {
+    // billing_cycles is estate-wide (no property_id FK).
+    // Return the most recent open/published cycle for the estate.
     return supabase
       .schema('native_property')
       .from('billing_cycles')
       .select('*')
-      .eq('property_id', propertyId)
+      .in('status', ['OPEN', 'PUBLISHED'])
       .order('start_date', { ascending: false })
       .limit(1)
       .single();
@@ -393,7 +395,7 @@ export const propertyApi = {
     let query = supabase
       .schema('native_property')
       .from('properties')
-      .select('*, users:property_ownerships!inner(user_id, ownership_type, is_active)', { count: 'exact' })
+      .select('*, property_ownerships(user_id, ownership_type, is_active)', { count: 'exact' })
       .order('created_at', { ascending: false });
 
     if (params?.property_type) query = query.eq('property_type', params.property_type);
@@ -407,7 +409,7 @@ export const propertyApi = {
     return supabase
       .schema('native_property')
       .from('properties')
-      .select('*, property_ownerships(*), utility_readings(*)')
+      .select('*, property_ownerships(*), utility_readings(*), payments(*)')
       .eq('id', id)
       .single();
   },
@@ -422,12 +424,33 @@ export const propertyApi = {
   },
 
   getOwners: async (id: string) => {
-    return supabase
+    // Fetch ownerships first
+    const { data: ownerships, error } = await supabase
       .schema('native_property')
       .from('property_ownerships')
       .select('*')
       .eq('property_id', id)
       .eq('is_active', true);
+
+    if (error || !ownerships || ownerships.length === 0) {
+      return { data: ownerships || [], error };
+    }
+
+    // Fetch user details from core.users for each owner
+    const userIds = [...new Set(ownerships.map((o) => o.user_id))];
+    const { data: users } = await supabase
+      .schema('core')
+      .from('users')
+      .select('id, first_name, last_name, email')
+      .in('id', userIds);
+
+    const userMap = new Map((users || []).map((u) => [u.id, u]));
+    const enriched = ownerships.map((o) => ({
+      ...o,
+      user: userMap.get(o.user_id) || null,
+    }));
+
+    return { data: enriched, error: null };
   },
 
   getAccessRequests: async (id: string) => {
@@ -704,52 +727,88 @@ export const financialApi = {
 // =============================================================================
 // Director API — direct Supabase queries
 // =============================================================================
+async function enrichDirectorsWithUsers(directors: any[] | null, error: any) {
+  if (error || !directors || directors.length === 0) {
+    return { data: directors || [], error };
+  }
+
+  const userIds = [...new Set(directors.map((d) => d.user_id).filter(Boolean))];
+  if (userIds.length === 0) {
+    return { data: directors, error: null };
+  }
+
+  const { data: users } = await supabase
+    .schema('core')
+    .from('users')
+    .select('id, first_name, last_name, email')
+    .in('id', userIds);
+
+  const userMap = new Map((users || []).map((u) => [u.id, u]));
+  const enriched = directors.map((d) => ({
+    ...d,
+    user: userMap.get(d.user_id) || null,
+  }));
+
+  return { data: enriched, error: null };
+}
+
 export const directorApi = {
   getAll: async () => {
-    return supabase
+    const { data, error } = await supabase
       .schema('native_property')
       .from('directors')
       .select('*')
       .order('elected_date', { ascending: false });
+    return enrichDirectorsWithUsers(data, error);
   },
 
   getActive: async () => {
-    return supabase
+    const { data, error } = await supabase
       .schema('native_property')
       .from('directors')
       .select('*')
       .eq('is_active', true)
       .order('term_end_date');
+    return enrichDirectorsWithUsers(data, error);
   },
 
   getExpiring: async () => {
     const threeMonthsFromNow = new Date();
     threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
-    return supabase
+    const { data, error } = await supabase
       .schema('native_property')
       .from('directors')
       .select('*')
       .eq('is_active', true)
       .lte('term_end_date', threeMonthsFromNow.toISOString())
       .order('term_end_date');
+    return enrichDirectorsWithUsers(data, error);
   },
 
   getByPosition: async (position: string) => {
-    return supabase
+    const { data, error } = await supabase
       .schema('native_property')
       .from('directors')
       .select('*')
       .eq('position', position)
       .eq('is_active', true);
+    return enrichDirectorsWithUsers(data, error);
   },
 
   getById: async (id: string) => {
-    return supabase
+    const { data, error } = await supabase
       .schema('native_property')
       .from('directors')
       .select('*')
       .eq('id', id)
       .single();
+
+    if (error || !data) {
+      return { data, error };
+    }
+
+    const enriched = await enrichDirectorsWithUsers([data], null);
+    return { data: enriched.data[0] || null, error: null };
   },
 
   create: async (data: { organization_id: string; user_id: string; position: string; elected_date: string; term_end_date: string; portfolio?: string; biography?: string; contact_email?: string }) => {

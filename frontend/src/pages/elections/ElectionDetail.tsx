@@ -18,9 +18,9 @@ const ElectionDetail = () => {
 
   const fetchElection = async () => {
     try {
-      const response = await electionApi.getById(id!);
-      if (response.data.success && response.data.data) {
-        setElection(response.data.data.election);
+      const { data, error } = await electionApi.getById(id!);
+      if (!error && data) {
+        setElection(data);
       }
     } catch (error) {
       console.error('Error fetching election:', error);
@@ -32,9 +32,7 @@ const ElectionDetail = () => {
   const fetchVotingStatus = async () => {
     try {
       const response = await votingApi.getStatus(id!);
-      if (response.data.success && response.data.data) {
-        setVotingStatus(response.data.data);
-      }
+      setVotingStatus(response);
     } catch (error) {
       console.error('Error fetching voting status:', error);
     }
@@ -56,7 +54,9 @@ const ElectionDetail = () => {
     );
   }
 
-  const canVote = votingStatus?.canVote && !votingStatus?.hasVoted;
+  const canVote = votingStatus && !votingStatus.hasVoted && (
+    election.status === 'VOTING_OPEN'
+  );
 
   return (
     <div className="space-y-6">
@@ -90,15 +90,15 @@ const ElectionDetail = () => {
           <div>
             <p className="text-sm text-gray-600">Nominations Period</p>
             <p className="font-medium">
-              {new Date(election.nominationsStartDate).toLocaleDateString()} -{' '}
-              {new Date(election.nominationsEndDate).toLocaleDateString()}
+              {new Date(election.nominations_start_date).toLocaleDateString()} -{' '}
+              {new Date(election.nominations_end_date).toLocaleDateString()}
             </p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Voting Period</p>
             <p className="font-medium">
-              {new Date(election.votingStartDate).toLocaleDateString()} -{' '}
-              {new Date(election.votingEndDate).toLocaleDateString()}
+              {new Date(election.voting_start_date).toLocaleDateString()} -{' '}
+              {new Date(election.voting_end_date).toLocaleDateString()}
             </p>
           </div>
         </div>
@@ -126,8 +126,8 @@ const ElectionDetail = () => {
                   )}
                   <div className="mt-2 flex items-center space-x-4 text-xs text-gray-500">
                     <span>Status: {candidate.status}</span>
-                    {candidate.votes?.[0] && (
-                      <span>Votes: {candidate.votes[0].voteCount}</span>
+                    {candidate.vote_choices?.[0] && (
+                      <span>Votes: {candidate.vote_choices[0].vote_count}</span>
                     )}
                   </div>
                 </div>
@@ -163,6 +163,3 @@ const ElectionDetail = () => {
 };
 
 export default ElectionDetail;
-
-
-

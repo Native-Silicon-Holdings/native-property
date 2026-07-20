@@ -28,12 +28,12 @@ const Header = ({ toggleSidebar }: HeaderProps) => {
             <div className="ml-4 flex items-center gap-3">
               <img
                 src="https://nativesi.co.za/images/native_logo.png"
-                alt="Native Books"
+                alt="Native Property"
                 width={36}
                 height={36}
                 className="h-9 w-9 object-contain"
               />
-              <h1 className="text-xl font-bold text-primary">Native Books</h1>
+              <h1 className="text-xl font-bold text-primary">Native Property</h1>
             </div>
           </div>
 
